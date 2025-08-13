@@ -1,0 +1,47 @@
+{
+  "name": "italian-real-estate-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Monorepo for an Italian Real Estate platform (Backend API + Admin Dashboard + Static site).",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "backend",
+    "admin-dashboard",
+    "static-website"
+  ],
+  "scripts": {
+    "prepare": "husky install",
+    "postinstall": "husky install",
+    "lint": "eslint . --ext .ts,.tsx --max-warnings=0",
+    "format": "prettier . -w",
+    "format:check": "prettier . -c",
+    "typecheck": "echo \"Run package-specific type checks\"",
+    "test": "npm -ws run test",
+    "build": "npm -ws run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.12",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-unused-imports": "^3.2.0",
+    "husky": "^9.1.4",
+    "lint-staged": "^15.2.9",
+    "prettier": "^3.3.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.5.4"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier -w"
+    ],
+    "*.{json,md,css,html}": [
+      "prettier -w"
+    ]
+  }
+}
