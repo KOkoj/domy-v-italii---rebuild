@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc -p tsconfig.json",
+    "vercel-build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "postinstall": "prisma generate",
     "lint": "eslint . --ext .ts --max-warnings=0",
