@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Building2, FileText, MessageSquare, Clock, TrendingUp, Calendar, Users, AlertCircle } from 'lucide-react'
-import axios from 'axios'
+import { api } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
 
 interface DashboardStats {
   propertiesCount: number
@@ -160,42 +161,18 @@ const ActivityCard: React.FC<{
 )
 
 export const DashboardPage: React.FC = () => {
+  const { isAuthenticated } = useAuth()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
-
-  // Get token from localStorage
-  const getToken = (): string | null => {
-    try {
-      const authData = localStorage.getItem('ire_admin_auth')
-      if (authData) {
-        const parsed = JSON.parse(authData)
-        return parsed.token || null
-      }
-      return null
-    } catch {
-      return null
-    }
-  }
-
   // Fetch dashboard data (requires auth)
   const fetchDashboardData = useCallback(async () => {
-    const token = getToken()
-    if (!token) {
-      setError('Please log in to see dashboard stats')
-      return
-    }
-
     setIsLoading(true)
     setError(null)
 
     try {
-      const response = await axios.get(`${API_URL}/dashboard`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await api.get('/dashboard', {
         timeout: 10000,
       })
 
@@ -204,8 +181,8 @@ export const DashboardPage: React.FC = () => {
       } else {
         throw new Error(response.data.message || 'Failed to fetch dashboard data')
       }
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
+    } catch (error: any) {
+      if (error.response?.status === 401) {
         setError('Please log in to see dashboard stats')
       } else {
         setError('Failed to load dashboard data')
@@ -214,24 +191,16 @@ export const DashboardPage: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [API_URL])
+  }, [])
 
   useEffect(() => {
-    // Fetch dashboard data if token is available
-    const token = getToken()
-    if (token) {
-      fetchDashboardData()
-    } else {
-      setError('Please log in to see dashboard stats')
-    }
+    fetchDashboardData()
   }, [fetchDashboardData])
-
-  const hasToken = !!getToken()
 
   return (
     <div className="space-y-6">
 
-      {!hasToken ? (
+      {!isAuthenticated ? (
         <div className="flex items-center justify-center min-h-[500px]">
           <div className="text-center bg-white rounded-xl shadow-sm border border-gray-200 p-12">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">

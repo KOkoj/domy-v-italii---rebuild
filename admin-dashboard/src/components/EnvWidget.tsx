@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { clsx } from 'clsx'
 import { Wifi, WifiOff, AlertCircle } from 'lucide-react'
+import { api } from '@/lib/api'
 import axios from 'axios'
 
 interface HealthStatus {
@@ -34,7 +35,7 @@ export const EnvWidget: React.FC = () => {
 
     try {
       // Check health endpoint
-      const healthResponse = await axios.get(`${apiUrl}/health`, { timeout: 5000 })
+      const healthResponse = await api.get('/health', { timeout: 5000 })
       newStatus.health = healthResponse.status === 200 ? 'online' : 'error'
     } catch {
       newStatus.health = 'offline'

@@ -10,3 +10,4 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  VITE_API_URL = "https://domyvitalii-kokojs-projects.vercel.app/api"
