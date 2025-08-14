@@ -1,41 +1,82 @@
-// backend/src/config/cors.ts (or .js)
-import cors from 'cors';
+import express from 'express';
+import compression from 'compression';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import { corsMiddleware } from './config/cors.js';
+import { apiRateLimiter } from './middlewares/rateLimit.js';
+import { errorHandler } from './middlewares/errorHandler.js';
+import { notFound } from './middlewares/notFound.js';
+import { apiRouter } from './routes/index.js';
+import { env } from './env.js';
 
-const allowedOrigins = [
-  'https://rebuilddomy.netlify.app', // Your Netlify frontend
-  'http://localhost:3000',
-  'http://localhost:5173', // Vite dev server
-  'http://localhost:5174', // Alternative Vite port
-];
+// Create Express application
+export const app = express();
 
-const corsOptions: cors.CorsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
+// Trust proxy for production deployment
+app.set('trust proxy', 1);
 
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('Blocked by CORS:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
+// Security middleware
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: [
-    'Origin',
-    'X-Requested-With',
-    'Content-Type',
-    'Accept',
-    'Authorization',
-    'Cache-Control',
-    'Pragma'
-  ],
-  exposedHeaders: ['Set-Cookie'],
-  maxAge: 86400, // 24 hours
-};
+}));
 
-export const corsMiddleware = cors(corsOptions);
-export const corsPreflight = cors(corsOptions);
+// CORS middleware
+app.use(corsMiddleware);
 
+// Compression middleware
+app.use(compression());
+
+// Logging middleware
+if (env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Rate limiting
+app.use(apiRateLimiter);
+
+// Health check endpoint (before API routes)
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'API is healthy',
+    timestamp: new Date().toISOString(),
+    env: env.NODE_ENV,
+  });
+});
+
+// API routes
+app.use('/api', apiRouter);
+
+// Root endpoint
+app.get('/', (_req, res) => {
+  res.json({
+    success: true,
+    message: 'Italian Real Estate API',
+    version: '1.0.0',
+    docs: '/api/docs',
+    health: '/health',
+  });
+});
+
+// 404 handler
+app.use(notFound);
+
+// Error handler (must be last)
+app.use(errorHandler);
+
+// Export app as default for server.ts compatibility
 export default app;
