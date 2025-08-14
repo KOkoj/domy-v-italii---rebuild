@@ -35,10 +35,11 @@ const corsOptions: CorsOptions = {
     // Allow non-browser tools (like curl/postman with no Origin)
     if (!origin) return cb(null, true);
 
-    if (originMatches(allowedOrigins, origin)) {
-      return cb(null, true);
-    }
-    return cb(new Error('CORS: Origin not allowed'));
+    if (originMatches(allowedOrigins, origin)) return cb(null, true);
+
+    const error: any = new Error(`CORS: Origin not allowed: ${origin}`);
+    error.status = 403;
+    return cb(error);
   },
   credentials: true, // ok even if you use Authorization header; doesn’t force cookies
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
