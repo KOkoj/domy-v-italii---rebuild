@@ -37,8 +37,9 @@ function originMatches(allowed: string[], origin: string): boolean {
 
 // Safe defaults for local/dev if env not set
 const defaultOrigins = [
-  'https://rebuilddomy.netlify.app',
-  'https://domyvitalii.vercel.app',
+  'https://domy-v-italii-rebuild-admin-dashboard-idem-4aq13i700.vercel.app',
+  'https://domy-v-italii-rebuild-admin-dashboa.vercel.app',
+  'https://*.vercel.app',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ].map(s => s.toLowerCase());
