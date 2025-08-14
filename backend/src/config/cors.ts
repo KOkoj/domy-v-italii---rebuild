@@ -4,67 +4,73 @@ function parseOrigins(envStr?: string): string[] {
   if (!envStr) return [];
   return envStr
     .split(',')
-    .map(o => o.trim())
+    .map(o => o.trim().toLowerCase())
     .filter(Boolean);
 }
 
 function originMatches(allowed: string[], origin: string): boolean {
-  for (const rule of allowed) {
-    // wildcard pattern: https://*.vercel.app
-    if (rule.includes('*')) {
-      const [scheme, host] = rule.split('://');
-      const originUrl = new URL(origin);
-      if (!host || !scheme) continue;
-      if (originUrl.protocol.replace(':', '') !== scheme) continue;
+  const o = origin.toLowerCase();
 
-      // turn "*.vercel.app" into "vercel.app" suffix check
-      const suffix = host.replace(/^\*\./, '');
-      if (originUrl.hostname === suffix) return true;
-      if (originUrl.hostname.endsWith(`.${suffix}`)) return true;
+  for (const rule of allowed) {
+    const r = rule.toLowerCase();
+
+    // wildcard pattern e.g. https://*.vercel.app
+    if (r.includes('*')) {
+      const [scheme, host] = r.split('://');
+      try {
+        const u = new URL(o);
+        if (!scheme || !host) continue;
+        if (u.protocol.replace(':', '') !== scheme) continue;
+
+        const suffix = host.replace(/^\*\./, ''); // "*.vercel.app" -> "vercel.app"
+        if (u.hostname === suffix) return true;
+        if (u.hostname.endsWith(`.${suffix}`)) return true;
+      } catch {
+        continue;
+      }
     } else {
-      if (origin === rule) return true;
+      if (o === r) return true;
     }
   }
   return false;
 }
 
-// Default allowed origins if ALLOWED_ORIGINS env var is not set
+// Safe defaults for local/dev if env not set
 const defaultOrigins = [
   'https://rebuilddomy.netlify.app',
   'https://domyvitalii.vercel.app',
   'http://localhost:5173',
-  'http://127.0.0.1:5173'
-];
+  'http://127.0.0.1:5173',
+].map(s => s.toLowerCase());
 
-const allowedOrigins = [
-  'https://rebuilddomy.netlify.app',
-  'https://domyvitalii.vercel.app',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173'
-];
+// Use env if present, else defaults
+const envOrigins = parseOrigins(process.env.ALLOWED_ORIGINS);
+const allowedOrigins = envOrigins.length ? envOrigins : defaultOrigins;
 
 const corsOptions: CorsOptions = {
   origin: (origin, cb) => {
-    // Allow non-browser tools (like curl/postman with no Origin)
+    // Allow non-browser tools (no Origin header)
     if (!origin) return cb(null, true);
 
-    if (originMatches(allowedOrigins, origin)) return cb(null, true);
+    if (originMatches(allowedOrigins, origin)) {
+      return cb(null, true);
+    }
 
-    const error: any = new Error(`CORS: Origin not allowed: ${origin}`);
-    error.status = 403;
-    return cb(error);
+    const err: any = new Error(`CORS: Origin not allowed: ${origin}`);
+    err.status = 403;
+    return cb(err);
   },
-  credentials: true, // Required for Authorization headers
+  credentials: true,
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
     'Authorization',
     'X-Requested-With',
     'Accept',
-    'Origin'
+    'Origin',
   ],
   exposedHeaders: ['Content-Length', 'Content-Type'],
-  optionsSuccessStatus: 204, // 204 No Content for preflight success
+  optionsSuccessStatus: 204, // if you see issues, change to 200
 };
 
 export const corsMiddleware = cors(corsOptions);
