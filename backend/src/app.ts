@@ -13,11 +13,11 @@ import { ok } from './utils/response.js';
 
 export const app = express();
 
-app.set('trust proxy', 1);
-
-// ✅ CORS FIRST (including preflight)
+// ✅ CORS MUST BE FIRST - before ANY other middleware
 app.use(corsMiddleware);
 app.options('*', corsPreflight);
+
+app.set('trust proxy', 1);
 
 // Security
 app.use(helmet());

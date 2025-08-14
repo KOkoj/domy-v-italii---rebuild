@@ -28,7 +28,15 @@ function originMatches(allowed: string[], origin: string): boolean {
   return false;
 }
 
-const allowedOrigins = parseOrigins(process.env.ALLOWED_ORIGINS);
+// Default allowed origins if ALLOWED_ORIGINS env var is not set
+const defaultOrigins = [
+  'https://rebuilddomy.netlify.app',
+  'https://domyvitalii.vercel.app',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173'
+];
+
+const allowedOrigins = parseOrigins(process.env.ALLOWED_ORIGINS) || defaultOrigins;
 
 const corsOptions: CorsOptions = {
   origin: (origin, cb) => {
@@ -41,7 +49,7 @@ const corsOptions: CorsOptions = {
     error.status = 403;
     return cb(error);
   },
-  credentials: true, // ok even if you use Authorization header; doesn’t force cookies
+  credentials: true, // Required for Authorization headers
   methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
@@ -51,7 +59,7 @@ const corsOptions: CorsOptions = {
     'Origin'
   ],
   exposedHeaders: ['Content-Length', 'Content-Type'],
-  optionsSuccessStatus: 200, // some browsers expect 200 on preflight
+  optionsSuccessStatus: 204, // 204 No Content for preflight success
 };
 
 export const corsMiddleware = cors(corsOptions);

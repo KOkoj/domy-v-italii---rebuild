@@ -23,7 +23,7 @@ import { corsPreflight } from '../config/cors.js';
  */
 export const authRouter = Router();
 
-// Explicit CORS preflight handling for auth routes
+// Explicit CORS preflight handling - MUST be first
 authRouter.options('/login', corsPreflight);
 authRouter.options('/refresh', corsPreflight);
 authRouter.options('/me', corsPreflight);

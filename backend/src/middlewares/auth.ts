@@ -4,10 +4,10 @@ import type { Role } from '@prisma/client';
 
 export type AuthRequest = Request & { user?: { id: string; role?: Role } };
 
-export function authenticate(req: AuthRequest, _res: Response, next: NextFunction) {
-  // Skip authentication for OPTIONS requests (CORS preflight)
+export function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
+  // Allow OPTIONS requests (CORS preflight) to pass through immediately
   if (req.method === 'OPTIONS') {
-    return next();
+    return res.sendStatus(204);
   }
 
   const header = req.headers.authorization;
