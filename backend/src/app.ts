@@ -1,48 +1,39 @@
-import express from 'express';
-import morgan from 'morgan';
-import helmet from 'helmet';
-import compression from 'compression';
-import swaggerUi from 'swagger-ui-express';
-import { apiRateLimiter } from './middlewares/rateLimit.js';
-import { corsMiddleware, corsPreflight } from './config/cors.js';
-import { errorHandler } from './middlewares/errorHandler.js';
-import { notFound } from './middlewares/notFound.js';
-import { apiRouter } from './routes/index.js';
-import { buildSwaggerSpec } from './config/swagger.js';
-import { ok } from './utils/response.js';
+// backend/src/config/cors.ts (or .js)
+import cors from 'cors';
 
-export const app = express();
+const allowedOrigins = [
+  'https://rebuilddomy.netlify.app', // Your Netlify frontend
+  'http://localhost:3000',
+  'http://localhost:5173', // Vite dev server
+  'http://localhost:5174', // Alternative Vite port
+];
 
-// ✅ CORS MUST BE FIRST - before ANY other middleware
-app.use(corsMiddleware);
-app.options('*', corsPreflight);
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
 
-app.set('trust proxy', 1);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'Pragma'
+  ],
+  exposedHeaders: ['Set-Cookie'],
+  maxAge: 86400, // 24 hours
+};
 
-// Security
-app.use(helmet());
-app.use(morgan('combined'));
-app.use(compression());
-
-// Body parsers
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Rate limiting only for API routes
-app.use('/api', apiRateLimiter as any);
-
-// Root endpoint
-app.get('/', (_req, res) => ok(res, { message: 'API server is running', version: '1.0.0' }));
-
-// Liveness
-app.get('/health', (_req, res) => ok(res, { status: 'ok' }));
-
-// Swagger
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(buildSwaggerSpec()));
-
-// API routes
-app.use('/api', apiRouter);
-
-// 404 & errors
-app.use(notFound);
-app.use(errorHandler);
+export const corsMiddleware = cors(corsOptions);
+export const corsPreflight = cors(corsOptions);
