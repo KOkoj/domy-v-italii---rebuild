@@ -1,8 +1,8 @@
-import slugify from 'slugify';
+import * as slugifyLib from 'slugify';
 import { prisma } from '../db/prisma.js';
 
 export async function uniqueSlug(base: string, table: 'property' | 'blogPost'): Promise<string> {
-  const baseSlug = slugify(base, { lower: true, strict: true, trim: true });
+  const baseSlug = (slugifyLib as any).default(base, { lower: true, strict: true, trim: true });
   let slug = baseSlug;
   let i = 1;
   // eslint-disable-next-line no-constant-condition

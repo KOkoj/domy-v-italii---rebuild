@@ -1,9 +1,21 @@
 {
   "version": 2,
+  "functions": {
+    "api/index.ts": {
+      "runtime": "nodejs20.x",
+      "includeFiles": [
+        "dist/**",
+        "node_modules/@prisma/**"
+      ]
+    }
+  },
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "/api/index.ts"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
