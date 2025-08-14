@@ -3,10 +3,7 @@
   "functions": {
     "api/index.ts": {
       "runtime": "nodejs20.x",
-      "includeFiles": [
-        "dist/**",
-        "node_modules/@prisma/**"
-      ]
+      "includeFiles": "dist/**"
     }
   },
   "routes": [
