@@ -1,34 +1,57 @@
-import cors from 'cors';
-import { env } from '../env.js';
+import cors, { CorsOptions } from 'cors';
 
-export function corsMiddleware() {
-  // Parse allowed origins from environment variable
-  const allowedOrigins = env.ALLOWED_ORIGINS
-    ? env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
-    : ['http://localhost:5173', 'http://127.0.0.1:5173'];
-
-  return cors({
-    origin(origin, cb) {
-      // Allow requests with no origin (mobile apps, curl, Postman)
-      if (!origin) return cb(null, true);
-
-      // Check if origin is in allowed list
-      if (allowedOrigins.includes(origin)) {
-        return cb(null, true);
-      }
-
-      // In development, be more permissive for localhost variations
-      if (env.NODE_ENV === 'development' && origin.includes('localhost')) {
-        return cb(null, true);
-      }
-
-      // Block unauthorized origins
-      const error = new Error(`CORS: Origin ${origin} not allowed`);
-      (error as any).status = 403;
-      return cb(error);
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  });
+function parseOrigins(envStr?: string): string[] {
+  if (!envStr) return [];
+  return envStr
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
 }
+
+function originMatches(allowed: string[], origin: string): boolean {
+  for (const rule of allowed) {
+    // wildcard pattern: https://*.vercel.app
+    if (rule.includes('*')) {
+      const [scheme, host] = rule.split('://');
+      const originUrl = new URL(origin);
+      if (!host || !scheme) continue;
+      if (originUrl.protocol.replace(':', '') !== scheme) continue;
+
+      // turn "*.vercel.app" into "vercel.app" suffix check
+      const suffix = host.replace(/^\*\./, '');
+      if (originUrl.hostname === suffix) return true;
+      if (originUrl.hostname.endsWith(`.${suffix}`)) return true;
+    } else {
+      if (origin === rule) return true;
+    }
+  }
+  return false;
+}
+
+const allowedOrigins = parseOrigins(process.env.ALLOWED_ORIGINS);
+
+const corsOptions: CorsOptions = {
+  origin: (origin, cb) => {
+    // Allow non-browser tools (like curl/postman with no Origin)
+    if (!origin) return cb(null, true);
+
+    if (originMatches(allowedOrigins, origin)) {
+      return cb(null, true);
+    }
+    return cb(new Error('CORS: Origin not allowed'));
+  },
+  credentials: true, // ok even if you use Authorization header; doesn’t force cookies
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin'
+  ],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  optionsSuccessStatus: 200, // some browsers expect 200 on preflight
+};
+
+export const corsMiddleware = cors(corsOptions);
+export const corsPreflight = cors(corsOptions);
