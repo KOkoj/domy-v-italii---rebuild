@@ -37,3 +37,5 @@ const corsOptions: cors.CorsOptions = {
 
 export const corsMiddleware = cors(corsOptions);
 export const corsPreflight = cors(corsOptions);
+
+export default app;
