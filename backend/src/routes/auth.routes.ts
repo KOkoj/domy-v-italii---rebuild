@@ -3,6 +3,7 @@ import { login, me, refresh, logout } from '../controllers/auth.controller.js';
 import { authenticate } from '../middlewares/auth.js';
 import { validateBody } from '../middlewares/validate.js';
 import { loginSchema, refreshSchema } from '../validation/auth.js';
+import { corsPreflight } from '../config/cors.js';
 
 /**
  * @swagger
@@ -22,6 +23,13 @@ import { loginSchema, refreshSchema } from '../validation/auth.js';
  */
 export const authRouter = Router();
 
+// Explicit CORS preflight handling for auth routes
+authRouter.options('/login', corsPreflight);
+authRouter.options('/refresh', corsPreflight);
+authRouter.options('/me', corsPreflight);
+authRouter.options('/logout', corsPreflight);
+
+// Auth routes
 authRouter.post('/login', validateBody(loginSchema), login);
 authRouter.post('/refresh', validateBody(refreshSchema), refresh);
 authRouter.get('/me', authenticate, me);

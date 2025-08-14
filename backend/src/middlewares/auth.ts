@@ -5,6 +5,11 @@ import type { Role } from '@prisma/client';
 export type AuthRequest = Request & { user?: { id: string; role?: Role } };
 
 export function authenticate(req: AuthRequest, _res: Response, next: NextFunction) {
+  // Skip authentication for OPTIONS requests (CORS preflight)
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     const err: any = new Error('Unauthorized');
