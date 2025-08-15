@@ -50,12 +50,26 @@ npm install
 Edit `.env` file:
 
 ```env
-VITE_API_URL=http://localhost:3001/api
+VITE_API_URL=/api
 VITE_APP_NAME=Italian Real Estate Admin
 VITE_APP_VERSION=0.1.0
 ```
 
-### 3. Development
+## 🔄 Proxy (No CORS)
+
+This project uses a CORS-free proxy setup:
+
+### Local Development
+- `VITE_API_URL=/api` - Frontend calls its own origin
+- Vite dev server proxies `/api/*` → `http://localhost:3001` (backend)
+- No CORS configuration needed on backend for dashboard calls
+
+### Production (Vercel)
+- `/api/*` requests are proxied by Vercel rewrite to the backend public URL
+- Backend URL: `https://domy-v-italii-rebuild-admin-dashboa.vercel.app`
+- All API calls appear same-origin to the browser
+
+## 3. Development
 
 ```bash
 npm run dev
