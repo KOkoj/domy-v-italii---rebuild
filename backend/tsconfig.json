@@ -3,7 +3,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "moduleResolution": "NodeNext",
-    "module": "NodeNext",
+    "module": "ESNext",
     "target": "ES2022",
     "lib": [
       "ES2022"
@@ -26,6 +26,7 @@
     "skipDefaultLibCheck": true
   },
   "include": [
-    "src"
+    "src",
+    "../api"
   ]
 }

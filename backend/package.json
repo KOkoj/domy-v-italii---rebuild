@@ -8,10 +8,12 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "build": "prisma generate && tsc -p tsconfig.json",
-    "vercel-build": "prisma generate && tsc -p tsconfig.json",
-    "start": "node dist/server.js",
+    "dev": "vercel dev",
+    "build": "echo 'Vercel builds functions automatically; no separate build needed'",
+    "start": "vercel dev",
+    "local-dev": "tsx watch src/server.ts",
+    "local-build": "prisma generate && tsc -p tsconfig.json",
+    "local-start": "node dist/server.js",
     "postinstall": "prisma generate",
     "lint": "eslint . --ext .ts --max-warnings=0",
     "format": "prettier . -w",
@@ -67,6 +69,7 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.20.3",
     "typescript": "^5.5.4",
+    "vercel": "^37.0.0",
     "vitest": "^2.0.5"
   }
 }

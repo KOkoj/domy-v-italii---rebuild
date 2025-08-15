@@ -58,6 +58,11 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// API health endpoint for Vercel serverless functions
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
 // API routes
 app.use('/api', apiRouter);
 
