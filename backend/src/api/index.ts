@@ -1,5 +1,5 @@
 import serverless from 'serverless-http';
-import { app } from '../dist/app.js';
+import { app } from '../app.js';
 
 // Vercel serverless function handler
 export default serverless(app);
