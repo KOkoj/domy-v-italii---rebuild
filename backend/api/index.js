@@ -1,6 +1,10 @@
-import serverless from 'serverless-http';
-import { app } from '../dist/app.js';
+const serverless = require('serverless-http');
 
-// Vercel serverless function handler
-export default serverless(app);
+// Dynamic import for ES modules
+const handler = async (req, res) => {
+  const { app } = await import('../dist/app.js');
+  return serverless(app)(req, res);
+};
+
+module.exports = handler;
 
