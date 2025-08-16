@@ -1,0 +1,9 @@
+{
+  "buildCommand": "cd backend && npm run build",
+  "installCommand": "npm install --prefix backend",
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "@vercel/node@3.0.7"
+    }
+  }
+}
