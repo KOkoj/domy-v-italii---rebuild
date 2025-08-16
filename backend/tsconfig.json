@@ -27,7 +27,6 @@
     "skipDefaultLibCheck": true
   },
   "include": [
-    "src",
-    "../api"
+    "src"
   ]
 }
