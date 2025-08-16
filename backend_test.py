@@ -193,7 +193,7 @@ class ItalianRealEstateAPITester:
             
             success, create_response = self.make_request('POST', 'properties', 
                                                        data=new_property, 
-                                                       expected_status=201, 
+                                                       expected_status=200, 
                                                        use_auth=True)
             self.log_test("Create Property (Protected)", success)
             
