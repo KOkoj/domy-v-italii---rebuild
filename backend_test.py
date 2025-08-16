@@ -258,15 +258,18 @@ class ItalianRealEstateAPITester:
                                      use_auth=False)
         self.log_test("Unauthorized Access Handling", success)
         
-        # Test invalid login
+        # Test invalid login (may cause backend crash - known issue)
         invalid_login = {
             "email": "invalid@example.com",
             "password": "wrongpassword"
         }
-        success, _ = self.make_request('POST', 'auth/login', 
-                                     data=invalid_login, 
-                                     expected_status=401)
-        self.log_test("Invalid Login Handling", success)
+        try:
+            success, _ = self.make_request('POST', 'auth/login', 
+                                         data=invalid_login, 
+                                         expected_status=401)
+            self.log_test("Invalid Login Handling", success)
+        except:
+            self.log_test("Invalid Login Handling", False, "Backend crashes on invalid login - needs fix")
 
     def test_cors_configuration(self):
         """Test CORS configuration"""
