@@ -110,13 +110,13 @@ class ItalianRealEstateAPITester:
         
         if success and 'data' in response:
             data = response['data']
-            if 'accessToken' in data:
-                self.token = data['accessToken']
+            if 'token' in data:
+                self.token = data['token']
                 if 'refreshToken' in data:
                     self.refresh_token = data['refreshToken']
                 self.log_test("Admin Login", True)
             else:
-                self.log_test("Admin Login", False, "No access token in response")
+                self.log_test("Admin Login", False, "No token in response")
         else:
             self.log_test("Admin Login", False, f"Login failed: {response}")
 
