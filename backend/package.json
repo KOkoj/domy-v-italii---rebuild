@@ -58,6 +58,7 @@
     "streamifier": "^0.1.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "tsx": "^4.20.3",
     "typescript": "^5.5.4",
     "zod": "^3.25.76"
   },
