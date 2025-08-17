@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vercel dev",
-    "build": "echo 'No build needed for serverless function'",
+    "build": "prisma generate && mkdir -p dist && echo 'Serverless function ready' > dist/build-info.txt",
     "start": "vercel dev",
     "local-dev": "tsx watch src/server.ts",
     "local-build": "prisma generate && tsc -p tsconfig.json",
