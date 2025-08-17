@@ -1,32 +1,41 @@
-// Serverless function entry point for Vercel deployment
-/* eslint-env node */
-/* eslint-disable @typescript-eslint/no-var-requires */
-const serverless = require('serverless-http');
-
 module.exports = async (req, res) => {
   try {
-    // Dynamically import the Express app using tsx for TypeScript support
-    const { createRequire } = require('module');
-    const require = createRequire(import.meta.url);
+    // Set CORS headers first
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
-    // Use tsx to run TypeScript directly
-    const { register } = require('tsx/esm');
-    await register();
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
     
-    // Import the TypeScript app
-    const { app } = await import('../backend/src/app.ts');
-    const handler = serverless(app);
+    // Simple health check for immediate testing
+    if (req.url === '/api/health') {
+      return res.status(200).json({
+        ok: true,
+        message: 'API is healthy',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'production'
+      });
+    }
     
-    return handler(req, res);
+    // For now, return a simple response to test deployment
+    return res.status(200).json({
+      message: 'Italian Real Estate API',
+      version: '1.0.0',
+      status: 'Deployment successful',
+      endpoint: req.url,
+      method: req.method,
+      timestamp: new Date().toISOString()
+    });
+    
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Serverless function error:', error);
+    console.error('API Error:', error);
     
-    // Return detailed error for debugging
     return res.status(500).json({
       error: 'Internal server error',
       message: error.message || 'Unknown error',
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       timestamp: new Date().toISOString()
     });
   }
