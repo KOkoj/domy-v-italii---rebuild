@@ -13,7 +13,9 @@
     "static-website"
   ],
   "dependencies": {
-    "serverless-http": "^3.2.0"
+    "serverless-http": "^3.2.0",
+    "@vercel/node": "^3.0.0",
+    "tsx": "^4.20.3"
   },
   "scripts": {
     "prepare": "if [ -z \"$CI\" ]; then husky install; fi",
