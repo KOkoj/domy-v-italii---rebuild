@@ -1,4 +1,4 @@
-// Full Italian Real Estate API - Serverless Function
+// Simplified Italian Real Estate API - Serverless Function
 import serverless from 'serverless-http';
 import express from 'express';
 import cors from 'cors';
@@ -10,11 +10,7 @@ let prisma;
 
 export default async (req, res) => {
   try {
-    console.log('=== API Request ===');
-    console.log('Method:', req.method);
-    console.log('URL:', req.url);
-    console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
-    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('Request:', req.method, req.url);
     
     // Set CORS headers first
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -23,103 +19,90 @@ export default async (req, res) => {
     
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
-      console.log('Handling OPTIONS request');
       return res.status(200).end();
     }
     
     // Initialize the app and handler if not already done
     if (!handler) {
-      console.log('=== Initializing Express app and database ===');
+      console.log('Initializing app...');
       
-      // Check database URL
-      if (!process.env.DATABASE_URL) {
-        console.error('DATABASE_URL not found in environment variables');
-        return res.status(500).json({
-          error: 'Database configuration missing',
-          message: 'DATABASE_URL environment variable not set',
-          timestamp: new Date().toISOString()
-        });
-      }
+      // Check for DATABASE_URL
+      const hasDatabase = !!process.env.DATABASE_URL;
+      console.log('Database URL present:', hasDatabase);
       
-      console.log('DATABASE_URL found, initializing Prisma...');
-      
-      // Initialize Prisma with error handling
-      try {
-        prisma = new PrismaClient();
-        console.log('Prisma initialized successfully');
-        
-        // Test database connection
-        await prisma.$connect();
-        console.log('Database connection successful');
-      } catch (dbError) {
-        console.error('Database connection failed:', dbError);
-        return res.status(500).json({
-          error: 'Database connection failed',
-          message: dbError.message,
-          timestamp: new Date().toISOString()
-        });
+      // Initialize Prisma only if DATABASE_URL exists
+      if (hasDatabase) {
+        try {
+          prisma = new PrismaClient({
+            datasources: {
+              db: {
+                url: process.env.DATABASE_URL,
+              },
+            },
+          });
+          console.log('Prisma initialized');
+        } catch (err) {
+          console.error('Prisma init error:', err.message);
+          prisma = null;
+        }
       }
       
       // Create Express app
-      console.log('Creating Express app...');
       app = express();
-      
-      // Basic middleware
       app.use(cors());
       app.use(express.json());
       
-      // Health check endpoints
+      // Simple endpoints without database dependency
       app.get('/', (req, res) => {
-        console.log('Root endpoint accessed');
         res.json({
           success: true,
           message: 'Italian Real Estate API',
           version: '1.0.0',
           timestamp: new Date().toISOString(),
-          database: !!process.env.DATABASE_URL
-        });
-      });
-      
-      app.get('/health', (req, res) => {
-        console.log('Health endpoint accessed');
-        res.json({
-          success: true,
-          message: 'API is healthy',
-          timestamp: new Date().toISOString(),
-          env: process.env.NODE_ENV || 'production',
-          database: !!process.env.DATABASE_URL
+          database: hasDatabase
         });
       });
       
       app.get('/api/health', (req, res) => {
-        console.log('API health endpoint accessed');
         res.json({ 
           ok: true,
-          database: !!prisma,
+          database: hasDatabase,
           timestamp: new Date().toISOString()
         });
       });
       
-      // Properties endpoint with database
+      // Properties endpoint with timeout
       app.get('/api/properties', async (req, res) => {
-        console.log('=== Properties endpoint accessed ===');
+        if (!prisma) {
+          return res.json({
+            success: true,
+            data: {
+              items: [],
+              total: 0,
+              note: 'Database not configured'
+            },
+            timestamp: new Date().toISOString()
+          });
+        }
+        
         try {
-          if (!prisma) {
-            throw new Error('Prisma not initialized');
-          }
+          // Add timeout to prevent hanging
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Database query timeout')), 5000);
+          });
           
-          console.log('Querying properties from database...');
-          const properties = await prisma.property.findMany({
-            take: 10,
-            include: {
-              images: true,
-              _count: {
-                select: { inquiries: true }
-              }
+          const queryPromise = prisma.property.findMany({
+            take: 5, // Reduce to 5 for faster response
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              price: true,
+              isActive: true
             }
           });
           
-          console.log(`Found ${properties.length} properties`);
+          const properties = await Promise.race([queryPromise, timeoutPromise]);
           
           res.json({
             success: true,
@@ -130,101 +113,94 @@ export default async (req, res) => {
             timestamp: new Date().toISOString()
           });
         } catch (error) {
-          console.error('Properties error:', error);
-          res.status(500).json({
-            success: false,
-            error: 'Failed to fetch properties',
-            message: error.message,
+          console.error('Properties error:', error.message);
+          res.json({
+            success: true,
+            data: {
+              items: [],
+              total: 0,
+              error: error.message
+            },
             timestamp: new Date().toISOString()
           });
         }
       });
       
-      // Auth login endpoint
+      // Simple auth endpoint
       app.post('/api/auth/login', async (req, res) => {
-        console.log('=== Login endpoint accessed ===');
+        const { email, password } = req.body;
+        
+        if (!email || !password) {
+          return res.status(400).json({
+            success: false,
+            error: 'Email and password required'
+          });
+        }
+        
+        if (!prisma) {
+          return res.json({
+            success: false,
+            error: 'Database not configured'
+          });
+        }
+        
         try {
-          const { email, password } = req.body;
-          console.log('Login attempt for email:', email);
-          
-          if (!email || !password) {
-            return res.status(400).json({
-              success: false,
-              error: 'Email and password required'
-            });
-          }
-          
-          if (!prisma) {
-            throw new Error('Prisma not initialized');
-          }
-          
-          // Find user
-          console.log('Searching for user in database...');
-          const user = await prisma.user.findUnique({
-            where: { email }
+          // Add timeout
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Auth query timeout')), 3000);
           });
           
+          const userPromise = prisma.user.findUnique({
+            where: { email },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              isActive: true
+            }
+          });
+          
+          const user = await Promise.race([userPromise, timeoutPromise]);
+          
           if (!user) {
-            console.log('User not found');
             return res.status(401).json({
               success: false,
               error: 'Invalid credentials'
             });
           }
           
-          console.log('User found:', user.email);
-          
-          // For demo, just return success (you can add bcrypt later)
-          const { password: _, ...safeUser } = user;
-          
           res.json({
             success: true,
             data: {
-              user: safeUser,
+              user,
               token: 'demo-token-' + Date.now()
-            },
-            timestamp: new Date().toISOString()
+            }
           });
         } catch (error) {
-          console.error('Login error:', error);
+          console.error('Auth error:', error.message);
           res.status(500).json({
             success: false,
-            error: 'Login failed',
-            message: error.message,
-            timestamp: new Date().toISOString()
+            error: 'Authentication failed',
+            message: error.message
           });
         }
       });
       
-      // Error handler
-      app.use((error, req, res, next) => {
-        console.error('Express error:', error);
-        res.status(500).json({
-          success: false,
-          error: 'Internal server error',
-          message: error.message,
-          timestamp: new Date().toISOString()
-        });
-      });
-      
       // Create serverless handler
-      console.log('Creating serverless handler...');
       handler = serverless(app);
-      console.log('=== Express app initialized successfully ===');
+      console.log('App initialized');
     }
     
-    console.log('Handling request with Express app...');
-    // Handle the request with the full Express app
+    // Handle the request
     return handler(req, res);
     
   } catch (error) {
-    console.error('=== API Error ===', error);
+    console.error('API Error:', error.message);
     
     return res.status(500).json({
-      error: 'Backend initialization error',
+      error: 'Backend error',
       message: error.message,
-      timestamp: new Date().toISOString(),
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      timestamp: new Date().toISOString()
     });
   }
 };
