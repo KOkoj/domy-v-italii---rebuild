@@ -1,5 +1,5 @@
-// Simple working serverless function for Vercel
-module.exports = async (req, res) => {
+// Simple working serverless function for Vercel (ES Module syntax)
+export default async (req, res) => {
   try {
     console.log('Function called:', req.method, req.url);
     
