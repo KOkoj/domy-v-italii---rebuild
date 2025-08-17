@@ -1,3 +1,13 @@
 {
-  "outputDirectory": "dist"
+  "functions": {
+    "dist/api/index.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/dist/api/index"
+    }
+  ]
 }
