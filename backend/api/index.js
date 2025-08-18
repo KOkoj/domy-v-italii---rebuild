@@ -176,10 +176,11 @@ export default async (req, res) => {
       // Transform data for frontend compatibility
       const transformedProperties = properties.map(property => ({
         ...property,
-        price: property.priceCents ? Math.round(property.priceCents / 100) : 0,
+        priceEuro: property.priceCents ? Math.round(property.priceCents / 100) : 0, // Frontend expects priceEuro
         propertyType: property.type,
-        isActive: property.status === 'active',
-        location: 'Location data pending' // We'll add location fields in next iteration
+        isActive: property.status === 'ACTIVE', // Fix boolean calculation
+        city: property.city || 'City pending', // Use actual city or placeholder
+        region: property.region || 'Region pending' // Use actual region or placeholder
       }));
       
       return res.status(200).json({
