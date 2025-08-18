@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 class ItalianRealEstateAPITester:
-    def __init__(self, base_url="http://localhost:3001"):
+    def __init__(self, base_url="https://domy-backend.vercel.app"):
         self.base_url = base_url
         self.api_base = f"{base_url}/api"
         self.token = None
