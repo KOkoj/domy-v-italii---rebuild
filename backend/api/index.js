@@ -162,6 +162,8 @@ export default async (req, res) => {
             bedrooms: true,
             bathrooms: true,
             area: true,
+            city: true,        // Add city field
+            region: true,      // Add region field  
             createdAt: true
           },
           orderBy: {
