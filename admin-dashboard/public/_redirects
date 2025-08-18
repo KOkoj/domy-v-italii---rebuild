@@ -1,0 +1,5 @@
+# Redirect API calls to backend
+/api/* https://domy-backend-git-em-kokojs-projects.vercel.app/api/:splat 200
+
+# Handle client-side routing
+/* /index.html 200

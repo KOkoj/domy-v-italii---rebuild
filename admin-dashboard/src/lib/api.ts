@@ -2,6 +2,14 @@ import axios, { AxiosError, AxiosResponse } from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
+// Debug logging for production
+console.log('API Configuration:', {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+  API_URL,
+  mode: import.meta.env.MODE,
+  env: import.meta.env
+})
+
 export interface ApiResponse<T = any> {
   success: boolean
   data?: T
