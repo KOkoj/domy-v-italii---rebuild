@@ -4,10 +4,16 @@
   publish = "dist"
 
 [build.environment]
-  VITE_API_URL = "/api"
+  VITE_API_URL = "https://domy-backend-git-em-kokojs-projects.vercel.app/api"
 
 [[redirects]]
   from = "/api/*"
-  to = "https://domy-v-italii-rebuild-admin-dashboa.vercel.app/api/:splat"
+  to = "https://domy-backend-git-em-kokojs-projects.vercel.app/api/:splat"
   status = 200
   force = true
+
+# Handle client-side routing (SPA)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
