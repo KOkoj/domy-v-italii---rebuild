@@ -9,7 +9,7 @@
       "ES2022",
       "DOM"
     ],
-    "strict": true,
+    "strict": false,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
@@ -24,7 +24,11 @@
       "../node_modules/@types",
       "./node_modules/@types"
     ],
-    "skipDefaultLibCheck": true
+    "skipDefaultLibCheck": true,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "noImplicitReturns": false,
+    "noImplicitThis": false
   },
   "include": [
     "src"

@@ -6,24 +6,37 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/
 import type { AuthRequest } from '../middlewares/auth.js';
 
 export async function login(req: AuthRequest, res: Response) {
-  const { email, password } = req.body as { email: string; password: string };
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    const err: any = new Error('Invalid credentials');
-    err.status = 401;
-    throw err;
-  }
-  const valid = await comparePassword(password, user.password);
-  if (!valid) {
-    const err: any = new Error('Invalid credentials');
-    err.status = 401;
-    throw err;
-  }
-  const token = signAccessToken({ id: user.id });
-  const refreshToken = signRefreshToken({ id: user.id });
+  try {
+    const { email, password } = req.body as { email: string; password: string };
+    const user = await prisma.user.findUnique({ where: { email } });
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials'
+      });
+    }
+    
+    const valid = await comparePassword(password, user.password);
+    if (!valid) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials'
+      });
+    }
+    
+    const token = signAccessToken({ id: user.id });
+    const refreshToken = signRefreshToken({ id: user.id });
 
-  const { password: _pw, ...safeUser } = user;
-  return ok(res, { user: safeUser, token, refreshToken });
+    const { password: _pw, ...safeUser } = user;
+    return ok(res, { user: safeUser, token, refreshToken });
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
 }
 
 export async function me(req: AuthRequest, res: Response) {

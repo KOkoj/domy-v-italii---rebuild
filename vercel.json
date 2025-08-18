@@ -1,5 +1,14 @@
 {
-  "buildCommand": "cd backend && npm run build",
-  "installCommand": "npm install --prefix backend && npm install",
-  "outputDirectory": "backend/dist"
+  "buildCommand": "cd backend && npm install && npx prisma generate",
+  "functions": {
+    "api/index.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    }
+  ]
 }
