@@ -110,13 +110,18 @@ export default async (req, res) => {
     try {
       console.log('Fetching properties from database...');
       
-      // Get properties from database with timeout
-      const properties = await withTimeout(
+      // First, let's check if there are ANY properties at all
+      const totalProperties = await withTimeout(
+        prisma.property.count(),
+        5000
+      );
+      
+      console.log(`Total properties in database: ${totalProperties}`);
+      
+      // Get all properties without filtering first
+      const allProperties = await withTimeout(
         prisma.property.findMany({
           take: 10,
-          where: {
-            isActive: true
-          },
           select: {
             id: true,
             title: true,
@@ -145,14 +150,30 @@ export default async (req, res) => {
         8000 // 8 second timeout
       );
       
-      console.log(`Found ${properties.length} properties`);
+      console.log(`Found ${allProperties.length} properties (unfiltered)`);
+      
+      // Count active properties separately
+      const activeCount = await withTimeout(
+        prisma.property.count({
+          where: { isActive: true }
+        }),
+        5000
+      );
+      
+      console.log(`Active properties: ${activeCount}`);
       
       return res.status(200).json({
         success: true,
         data: {
-          items: properties,
-          total: properties.length,
-          source: 'Supabase Database'
+          items: allProperties,
+          total: allProperties.length,
+          totalInDatabase: totalProperties,
+          activeCount: activeCount,
+          source: 'Supabase Database',
+          debug: {
+            queryExecuted: 'prisma.property.findMany with no isActive filter',
+            timestamp: new Date().toISOString()
+          }
         },
         timestamp: new Date().toISOString()
       });
@@ -160,19 +181,19 @@ export default async (req, res) => {
     } catch (error) {
       console.error('Properties query error:', error.message);
       
-      // Fallback to test data on database error
+      // Enhanced error response with more details
       return res.status(200).json({
         success: true,
         data: {
-          items: [{
-            id: 'fallback-001',
-            title: 'Database Connection Issue',
-            price: 0,
-            location: 'Error Fallback',
-            note: 'Database error: ' + error.message
-          }],
+          items: [],
           total: 0,
-          error: error.message
+          error: error.message,
+          debug: {
+            errorType: error.constructor.name,
+            isPrismaError: error.code ? true : false,
+            prismaErrorCode: error.code || 'N/A',
+            fullError: error.toString()
+          }
         },
         timestamp: new Date().toISOString()
       });
