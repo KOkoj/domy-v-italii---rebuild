@@ -326,6 +326,16 @@ export default async (req, res) => {
         message: error.message,
         timestamp: new Date().toISOString()
       });
+    } finally {
+      // Always disconnect to avoid connection pooling issues
+      if (prisma) {
+        try {
+          await prisma.$disconnect();
+          console.log('Auth Prisma client disconnected successfully');
+        } catch (e) {
+          console.log('Auth Prisma disconnect warning:', e.message);
+        }
+      }
     }
   }
   
