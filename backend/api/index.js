@@ -1,4 +1,4 @@
-// Italian Real Estate API with Database Connectivity
+// Italian Real Estate API with Database Connectivity - Updated
 import { PrismaClient } from '@prisma/client';
 
 // Helper function to create a fresh Prisma client for each request (avoids connection pooling issues)
