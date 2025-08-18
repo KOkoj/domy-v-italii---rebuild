@@ -407,7 +407,10 @@ export default async (req, res) => {
       });
     }
     
+    let prisma;
     try {
+      prisma = createPrismaClient();
+      
       const posts = await withTimeout(
         prisma.blogPost.findMany({
           take: 10,
