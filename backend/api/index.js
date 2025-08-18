@@ -387,6 +387,14 @@ export default async (req, res) => {
         error: 'Failed to fetch users',
         message: error.message
       });
+    } finally {
+      if (prisma) {
+        try {
+          await prisma.$disconnect();
+        } catch (e) {
+          console.log('Users Prisma disconnect warning:', e.message);
+        }
+      }
     }
   }
   
