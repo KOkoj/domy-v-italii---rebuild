@@ -1,14 +1,16 @@
 // Italian Real Estate API with Database Connectivity
 import { PrismaClient } from '@prisma/client';
 
-// Create Prisma client with connection pooling optimized for serverless
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
+// Helper function to create a fresh Prisma client for each request (avoids connection pooling issues)
+const createPrismaClient = () => {
+  return new PrismaClient({
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
     },
-  },
-});
+  });
+};
 
 // Helper function to run database queries with timeout
 const withTimeout = (promise, timeoutMs = 8000) => {
@@ -62,13 +64,20 @@ export default async (req, res) => {
     let dbStatus = 'Not configured';
     
     if (hasDatabase) {
+      let prisma;
       try {
+        // Create fresh client for health check
+        prisma = createPrismaClient();
+        
         // Quick database health check with timeout
         await withTimeout(prisma.$queryRaw`SELECT 1`, 3000);
         dbStatus = 'Connected and healthy';
       } catch (error) {
         console.error('Database health check failed:', error.message);
         dbStatus = 'Connected but error: ' + error.message;
+      } finally {
+        // Always disconnect
+        if (prisma) await prisma.$disconnect();
       }
     }
     
@@ -88,10 +97,8 @@ export default async (req, res) => {
         {
           id: 'test-001',
           title: 'Villa in Tuscany (Test Data)',
-          priceCents: 125000000, // €1,250,000 in cents
-          address: 'Via Chianti',
-          city: 'Chianti',
-          region: 'Tuscany',
+          price: 1250000,
+          location: 'Chianti, Tuscany',
           bedrooms: 5,
           bathrooms: 4,
           status: 'active'
@@ -109,19 +116,38 @@ export default async (req, res) => {
       });
     }
     
+    let prisma;
     try {
-      console.log('Fetching properties from database with correct schema...');
+      console.log('Creating fresh Prisma client for properties...');
       
-      // First, let's check if there are ANY properties at all
+      // Create fresh client to avoid connection pooling issues
+      prisma = createPrismaClient();
+      
+      // Simple query first - just count all properties
+      console.log('Counting total properties...');
       const totalProperties = await withTimeout(
         prisma.property.count(),
         5000
       );
       
-      console.log(`Total properties in database: ${totalProperties}`);
+      console.log(`Database contains ${totalProperties} total properties`);
       
-      // Get all properties using the correct field names
-      const allProperties = await withTimeout(
+      if (totalProperties === 0) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            items: [],
+            total: 0,
+            totalInDatabase: 0,
+            note: 'Database table exists but contains no properties'
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      // Get properties with simplified select (only basic fields)
+      console.log('Fetching properties with basic fields...');
+      const properties = await withTimeout(
         prisma.property.findMany({
           take: 10,
           select: {
@@ -129,65 +155,31 @@ export default async (req, res) => {
             title: true,
             slug: true,
             description: true,
-            priceCents: true,  // Correct field name
-            address: true,     // Correct field name  
-            city: true,        // Correct field name
-            region: true,      // Correct field name
-            postalCode: true,
+            priceCents: true,
+            type: true,
+            status: true,
             bedrooms: true,
             bathrooms: true,
             area: true,
-            type: true,        // Correct field name (not propertyType)
-            status: true,      // Correct field name (not isActive)
-            yearBuilt: true,
-            lotSize: true,
-            features: true,
-            createdAt: true,
-            updatedAt: true,
-            images: {
-              take: 3,
-              select: {
-                url: true,
-                alt: true
-              }
-            },
-            author: {
-              select: {
-                name: true,
-                email: true
-              }
-            }
+            createdAt: true
           },
           orderBy: {
             createdAt: 'desc'
           }
         }),
-        8000 // 8 second timeout
+        8000
       );
       
-      console.log(`Found ${allProperties.length} properties (with correct schema)`);
+      console.log(`Retrieved ${properties.length} properties`);
       
-      // Transform priceCents to price for frontend
-      const transformedProperties = allProperties.map(property => ({
+      // Transform data for frontend compatibility
+      const transformedProperties = properties.map(property => ({
         ...property,
-        price: property.priceCents ? property.priceCents / 100 : 0, // Convert cents to euros
-        location: `${property.address || ''}, ${property.city || ''}, ${property.region || ''}`.replace(/^,\s*|,\s*$/g, '').replace(/,\s*,/g, ','), // Combine address fields
-        propertyType: property.type, // Alias for frontend compatibility
-        isActive: property.status === 'active' // Convert status to boolean
+        price: property.priceCents ? Math.round(property.priceCents / 100) : 0,
+        propertyType: property.type,
+        isActive: property.status === 'active',
+        location: 'Location data pending' // We'll add location fields in next iteration
       }));
-      
-      // Count by status
-      const statusCounts = await withTimeout(
-        prisma.property.groupBy({
-          by: ['status'],
-          _count: {
-            status: true
-          }
-        }),
-        5000
-      );
-      
-      console.log('Properties by status:', statusCounts);
       
       return res.status(200).json({
         success: true,
@@ -195,20 +187,11 @@ export default async (req, res) => {
           items: transformedProperties,
           total: transformedProperties.length,
           totalInDatabase: totalProperties,
-          statusBreakdown: statusCounts.reduce((acc, curr) => {
-            acc[curr.status] = curr._count.status;
-            return acc;
-          }, {}),
-          source: 'Supabase Database',
+          source: 'Supabase Database (simplified query)',
           debug: {
-            queryExecuted: 'prisma.property.findMany with correct schema fields',
-            schemaUsed: {
-              price: 'priceCents (converted /100)',
-              location: 'address + city + region (combined)',
-              propertyType: 'type (aliased)',
-              isActive: 'status === "active" (converted)'
-            },
-            timestamp: new Date().toISOString()
+            queryApproach: 'Fresh Prisma client + basic fields only',
+            fieldsUsed: ['id', 'title', 'slug', 'description', 'priceCents', 'type', 'status', 'bedrooms', 'bathrooms', 'area'],
+            connectionPoolingFix: 'Using fresh client per request'
           }
         },
         timestamp: new Date().toISOString()
@@ -217,7 +200,6 @@ export default async (req, res) => {
     } catch (error) {
       console.error('Properties query error:', error.message);
       
-      // Enhanced error response with more details
       return res.status(200).json({
         success: true,
         data: {
@@ -228,12 +210,24 @@ export default async (req, res) => {
             errorType: error.constructor.name,
             isPrismaError: error.code ? true : false,
             prismaErrorCode: error.code || 'N/A',
-            fullError: error.toString(),
-            attemptedFix: 'Used correct schema fields: priceCents, address, city, region, type, status'
+            connectionPoolingFix: 'Attempted fresh client creation',
+            suggestion: error.message.includes('prepared statement') ? 
+              'Connection pooling issue with PgBouncer - using fresh client should resolve this' :
+              'Database schema or connection issue'
           }
         },
         timestamp: new Date().toISOString()
       });
+    } finally {
+      // Always disconnect to avoid connection pooling issues
+      if (prisma) {
+        try {
+          await prisma.$disconnect();
+          console.log('Prisma client disconnected successfully');
+        } catch (e) {
+          console.log('Prisma disconnect warning:', e.message);
+        }
+      }
     }
   }
   
