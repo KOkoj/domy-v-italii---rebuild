@@ -1,5 +1,5 @@
-# Redirect API calls to backend
-/api/* https://domy-backend-git-em-kokojs-projects.vercel.app/api/:splat 200
+# Redirect API calls to backend - must be first rule
+/api/* https://domy-backend-git-em-kokojs-projects.vercel.app/api/:splat 200!
 
-# Handle client-side routing
+# Handle client-side routing - must be last
 /* /index.html 200
