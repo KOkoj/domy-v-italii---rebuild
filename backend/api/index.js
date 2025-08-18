@@ -430,6 +430,127 @@ export default async (req, res) => {
     }
   }
   
+  // Seed properties endpoint (for testing)
+  if (url.includes('/seed/properties') && req.method === 'POST') {
+    if (!hasDatabase) {
+      return res.status(400).json({
+        success: false,
+        error: 'Database not configured'
+      });
+    }
+    
+    let prisma;
+    try {
+      console.log('Creating seed properties...');
+      prisma = createPrismaClient();
+      
+      const testProperties = [
+        {
+          title: 'Elegant Villa in Tuscany',
+          slug: 'elegant-villa-tuscany',
+          description: 'Beautiful countryside villa with vineyard views in the heart of Chianti region',
+          priceCents: 125000000, // €1,250,000
+          type: 'villa',
+          status: 'active',
+          bedrooms: 5,
+          bathrooms: 4,
+          area: 320,
+          address: 'Via del Chianti 123',
+          city: 'Greve in Chianti',
+          region: 'Tuscany',
+          postalCode: '50022',
+          yearBuilt: 1850,
+          lotSize: 5000,
+          features: ['Swimming Pool', 'Wine Cellar', 'Garden', 'Parking', 'Fireplace']
+        },
+        {
+          title: 'Modern Apartment in Milan Center',
+          slug: 'modern-apartment-milan-center',
+          description: 'Luxury apartment in the prestigious Brera district with contemporary amenities',
+          priceCents: 85000000, // €850,000
+          type: 'apartment',
+          status: 'active',
+          bedrooms: 3,
+          bathrooms: 2,
+          area: 150,
+          address: 'Via Brera 45',
+          city: 'Milan',
+          region: 'Lombardy',
+          postalCode: '20121',
+          yearBuilt: 2020,
+          features: ['Elevator', 'Balcony', 'Air Conditioning', 'Modern Kitchen']
+        },
+        {
+          title: 'Historic Palazzo in Rome',
+          slug: 'historic-palazzo-rome',
+          description: 'Restored 17th century palazzo near the Colosseum with original frescoes',
+          priceCents: 210000000, // €2,100,000
+          type: 'palazzo',
+          status: 'active',
+          bedrooms: 6,
+          bathrooms: 5,
+          area: 450,
+          address: 'Via dei Fori Imperiali 87',
+          city: 'Rome',
+          region: 'Lazio',
+          postalCode: '00184',
+          yearBuilt: 1650,
+          features: ['Historic Features', 'Terrace', 'Original Frescoes', 'Courtyard', 'Wine Cellar']
+        }
+      ];
+      
+      // Insert properties one by one
+      const createdProperties = [];
+      for (const property of testProperties) {
+        const created = await withTimeout(
+          prisma.property.create({
+            data: property
+          }),
+          10000
+        );
+        createdProperties.push(created);
+        console.log(`Created property: ${created.title}`);
+      }
+      
+      return res.status(200).json({
+        success: true,
+        data: {
+          message: 'Test properties created successfully',
+          created: createdProperties.length,
+          properties: createdProperties.map(p => ({
+            id: p.id,
+            title: p.title,
+            price: Math.round(p.priceCents / 100),
+            location: `${p.city}, ${p.region}`
+          }))
+        },
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      console.error('Seed properties error:', error.message);
+      
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to create test properties',
+        message: error.message,
+        debug: {
+          errorType: error.constructor.name,
+          isPrismaError: error.code ? true : false,
+          prismaErrorCode: error.code || 'N/A'
+        }
+      });
+    } finally {
+      if (prisma) {
+        try {
+          await prisma.$disconnect();
+        } catch (e) {
+          console.log('Disconnect warning:', e.message);
+        }
+      }
+    }
+  }
+  
   // Default 404 response
   return res.status(404).json({
     success: false,
@@ -442,7 +563,8 @@ export default async (req, res) => {
       'GET /api/properties',
       'POST /api/auth/login',
       'GET /api/users',
-      'GET /api/blog'
+      'GET /api/blog',
+      'POST /api/seed/properties (for testing)'
     ],
     timestamp: new Date().toISOString()
   });
