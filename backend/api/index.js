@@ -258,8 +258,12 @@ export default async (req, res) => {
       return res.status(401).json({ success: false, error: 'Invalid credentials' });
     }
     
+    let prisma;
     try {
       console.log('Authenticating user:', email);
+      
+      // Create fresh Prisma client for authentication
+      prisma = createPrismaClient();
       
       // Find user in database with timeout
       const user = await withTimeout(
