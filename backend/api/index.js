@@ -194,7 +194,7 @@ export default async (req, res) => {
           source: 'Supabase Database (simplified query)',
           debug: {
             queryApproach: 'Fresh Prisma client + basic fields only',
-            fieldsUsed: ['id', 'title', 'slug', 'description', 'priceCents', 'type', 'status', 'bedrooms', 'bathrooms', 'area'],
+            fieldsUsed: ['id', 'title', 'slug', 'description', 'priceCents', 'type', 'status', 'bedrooms', 'bathrooms', 'area', 'city', 'region'],
             connectionPoolingFix: 'Using fresh client per request'
           }
         },
