@@ -1,12 +1,15 @@
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://domy-v-italii-rebuild-admin-dashboa.vercel.app/api/$1" },
+    {
+      "source": "/api/(.*)",
+      "destination": "https://domy-backend-git-em-kokojs-projects.vercel.app/api/$1"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
   "env": {
-    "VITE_API_URL": "/api"
+    "VITE_API_URL": "https://domy-backend-git-em-kokojs-projects.vercel.app/api"
   }
 }
