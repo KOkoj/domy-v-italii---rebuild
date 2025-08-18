@@ -455,6 +455,14 @@ export default async (req, res) => {
         error: 'Failed to fetch blog posts',
         message: error.message
       });
+    } finally {
+      if (prisma) {
+        try {
+          await prisma.$disconnect();
+        } catch (e) {
+          console.log('Blog Prisma disconnect warning:', e.message);
+        }
+      }
     }
   }
   
