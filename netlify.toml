@@ -6,11 +6,13 @@
 [build.environment]
   VITE_API_URL = "https://domy-backend-git-em-kokojs-projects.vercel.app/api"
 
+# API proxy redirects
 [[redirects]]
   from = "/api/*"
   to = "https://domy-backend-git-em-kokojs-projects.vercel.app/api/:splat"
   status = 200
   force = true
+  headers = {X-From = "Netlify"}
 
 # Handle client-side routing (SPA)
 [[redirects]]
