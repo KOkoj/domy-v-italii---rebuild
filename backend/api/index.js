@@ -88,11 +88,13 @@ export default async (req, res) => {
         {
           id: 'test-001',
           title: 'Villa in Tuscany (Test Data)',
-          price: 1250000,
-          location: 'Chianti, Tuscany',
+          priceCents: 125000000, // €1,250,000 in cents
+          address: 'Via Chianti',
+          city: 'Chianti',
+          region: 'Tuscany',
           bedrooms: 5,
           bathrooms: 4,
-          isActive: true
+          status: 'active'
         }
       ];
       
@@ -108,7 +110,7 @@ export default async (req, res) => {
     }
     
     try {
-      console.log('Fetching properties from database...');
+      console.log('Fetching properties from database with correct schema...');
       
       // First, let's check if there are ANY properties at all
       const totalProperties = await withTimeout(
@@ -118,7 +120,7 @@ export default async (req, res) => {
       
       console.log(`Total properties in database: ${totalProperties}`);
       
-      // Get all properties without filtering first
+      // Get all properties using the correct field names
       const allProperties = await withTimeout(
         prisma.property.findMany({
           take: 10,
@@ -127,19 +129,32 @@ export default async (req, res) => {
             title: true,
             slug: true,
             description: true,
-            price: true,
-            location: true,
+            priceCents: true,  // Correct field name
+            address: true,     // Correct field name  
+            city: true,        // Correct field name
+            region: true,      // Correct field name
+            postalCode: true,
             bedrooms: true,
             bathrooms: true,
             area: true,
-            propertyType: true,
-            isActive: true,
+            type: true,        // Correct field name (not propertyType)
+            status: true,      // Correct field name (not isActive)
+            yearBuilt: true,
+            lotSize: true,
+            features: true,
             createdAt: true,
+            updatedAt: true,
             images: {
-              take: 1,
+              take: 3,
               select: {
                 url: true,
                 alt: true
+              }
+            },
+            author: {
+              select: {
+                name: true,
+                email: true
               }
             }
           },
@@ -150,28 +165,49 @@ export default async (req, res) => {
         8000 // 8 second timeout
       );
       
-      console.log(`Found ${allProperties.length} properties (unfiltered)`);
+      console.log(`Found ${allProperties.length} properties (with correct schema)`);
       
-      // Count active properties separately
-      const activeCount = await withTimeout(
-        prisma.property.count({
-          where: { isActive: true }
+      // Transform priceCents to price for frontend
+      const transformedProperties = allProperties.map(property => ({
+        ...property,
+        price: property.priceCents ? property.priceCents / 100 : 0, // Convert cents to euros
+        location: `${property.address || ''}, ${property.city || ''}, ${property.region || ''}`.replace(/^,\s*|,\s*$/g, '').replace(/,\s*,/g, ','), // Combine address fields
+        propertyType: property.type, // Alias for frontend compatibility
+        isActive: property.status === 'active' // Convert status to boolean
+      }));
+      
+      // Count by status
+      const statusCounts = await withTimeout(
+        prisma.property.groupBy({
+          by: ['status'],
+          _count: {
+            status: true
+          }
         }),
         5000
       );
       
-      console.log(`Active properties: ${activeCount}`);
+      console.log('Properties by status:', statusCounts);
       
       return res.status(200).json({
         success: true,
         data: {
-          items: allProperties,
-          total: allProperties.length,
+          items: transformedProperties,
+          total: transformedProperties.length,
           totalInDatabase: totalProperties,
-          activeCount: activeCount,
+          statusBreakdown: statusCounts.reduce((acc, curr) => {
+            acc[curr.status] = curr._count.status;
+            return acc;
+          }, {}),
           source: 'Supabase Database',
           debug: {
-            queryExecuted: 'prisma.property.findMany with no isActive filter',
+            queryExecuted: 'prisma.property.findMany with correct schema fields',
+            schemaUsed: {
+              price: 'priceCents (converted /100)',
+              location: 'address + city + region (combined)',
+              propertyType: 'type (aliased)',
+              isActive: 'status === "active" (converted)'
+            },
             timestamp: new Date().toISOString()
           }
         },
@@ -192,7 +228,8 @@ export default async (req, res) => {
             errorType: error.constructor.name,
             isPrismaError: error.code ? true : false,
             prismaErrorCode: error.code || 'N/A',
-            fullError: error.toString()
+            fullError: error.toString(),
+            attemptedFix: 'Used correct schema fields: priceCents, address, city, region, type, status'
           }
         },
         timestamp: new Date().toISOString()
