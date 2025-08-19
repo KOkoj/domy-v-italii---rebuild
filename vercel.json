@@ -1,14 +1,15 @@
 {
   "version": 2,
-  "functions": {
-    "backend/api/index.js": {
-      "runtime": "@vercel/node@3.0.27"
-    }
-  },
-  "rewrites": [
+  "builds": [
     {
-      "source": "/(.*)",
-      "destination": "/backend/api/index.js"
+      "src": "backend/api/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/backend/api/index.js"
     }
   ]
 }
