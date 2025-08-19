@@ -7,11 +7,6 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "workspaces": [
-    "backend",
-    "admin-dashboard",
-    "static-website"
-  ],
   "dependencies": {
     "serverless-http": "^3.2.0",
     "@vercel/node": "^3.0.0",
