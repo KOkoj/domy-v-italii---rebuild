@@ -233,13 +233,17 @@ export const DashboardPage: React.FC = () => {
 
       if (response.data.success) {
         setDashboardData(response.data.data)
+        console.log('Dashboard data loaded successfully:', response.data.data)
       } else {
         throw new Error(response.data.message || 'Failed to fetch dashboard data')
       }
     } catch (error: any) {
-      console.log('Dashboard endpoint not available, trying fallback...')
+      console.error('Dashboard endpoint failed:', error.message)
+      console.log('Trying fallback mode...')
       // If dashboard endpoint is not available, try fallback
       await fetchFallbackData()
+    } finally {
+      setIsLoading(false)
     }
   }, [fetchFallbackData])
 

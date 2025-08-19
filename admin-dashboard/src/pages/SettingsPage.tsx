@@ -30,11 +30,33 @@ export const SettingsPage: React.FC = () => {
     queryFn: async () => {
       try {
         const response = await api.get('/settings')
+        
+        // Handle 501 Not Implemented response
+        if (response.status === 501) {
+          return {
+            siteName: 'Italian Real Estate',
+            contactEmail: 'admin@example.com',
+            currency: 'EUR',
+            locale: 'it-IT'
+          }
+        }
+        
         if (response.data.success) {
           return response.data.data as AppSettings
         }
         throw new Error(response.data.message || 'Failed to fetch settings')
       } catch (error) {
+        // Handle 501 errors gracefully
+        if (error.response?.status === 501) {
+          console.log('Settings endpoint not yet implemented')
+          return {
+            siteName: 'Italian Real Estate',
+            contactEmail: 'admin@example.com',
+            currency: 'EUR',
+            locale: 'it-IT'
+          }
+        }
+        
         const normalizedError = normalizeError(error)
         toast.error(normalizedError.message)
         throw error

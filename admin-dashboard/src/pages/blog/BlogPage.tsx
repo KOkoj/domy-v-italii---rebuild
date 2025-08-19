@@ -50,11 +50,23 @@ export const BlogPage: React.FC = () => {
         })
 
         const response = await api.get(`/blog?${params}`)
+        
+        // Handle 501 Not Implemented response
+        if (response.status === 501) {
+          return { items: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } }
+        }
+        
         if (response.data.success) {
           return response.data.data as BlogResponse
         }
         throw new Error(response.data.message || 'Failed to fetch blog posts')
       } catch (error) {
+        // Handle 501 errors gracefully
+        if (error.response?.status === 501) {
+          console.log('Blog endpoint not yet implemented')
+          return { items: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } }
+        }
+        
         const normalizedError = normalizeError(error)
         toast.error(normalizedError.message)
         throw error
