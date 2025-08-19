@@ -1,6 +1,6 @@
 /* eslint-disable no-undef, no-console, no-useless-escape */
 // Italian Real Estate API with Database Connectivity - Complete
-import { PrismaClient } from '@prisma/client';
+const { PrismaClient } = require('@prisma/client');
 
 // Helper function to create a fresh Prisma client for each request (avoids connection pooling issues)
 const createPrismaClient = () => {
@@ -31,7 +31,7 @@ const parseBody = (req) => {
   return {};
 };
 
-export default async (req, res) => {
+const handler = async (req, res) => {
   console.log('Request:', req.method, req.url);
   
   // Set CORS headers
@@ -1046,3 +1046,5 @@ export default async (req, res) => {
     timestamp: new Date().toISOString()
   });
 };
+
+module.exports = handler;
