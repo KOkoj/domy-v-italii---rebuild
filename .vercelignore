@@ -1,0 +1,13 @@
+admin-dashboard/
+docs/
+tests/
+scripts/
+*.md
+.git/
+.emergent/
+node_modules/
+.env.local
+.env.development
+.env.test
+yarn.lock
+yarn-error.log
