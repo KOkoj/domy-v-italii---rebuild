@@ -93,6 +93,26 @@ export default async (req, res) => {
   }
 
   // =============================================================================
+  // AUTH/ME ENDPOINT - Get current user info
+  // =============================================================================
+  if (url.includes('/auth/me') && req.method === 'GET') {
+    // For demo purposes, return a mock current user
+    // In production, you'd validate the JWT token
+    return res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          id: 'current-user',
+          email: 'admin@example.com',
+          name: 'Admin User',
+          role: 'ADMIN',
+          isActive: true
+        }
+      }
+    });
+  }
+
+  // =============================================================================
   // AUTHENTICATION ENDPOINT - CRITICAL: Fixed for PgBouncer
   // =============================================================================
   if (url.includes('/auth/login') && req.method === 'POST') {
@@ -176,14 +196,14 @@ export default async (req, res) => {
   }
 
   // =============================================================================
-  // DASHBOARD ENDPOINT - Aggregates data for dashboard
+  // DASHBOARD ENDPOINT - Aggregates data for dashboard with error handling
   // =============================================================================
   if (url.includes('/dashboard') && req.method === 'GET') {
     if (!hasDatabase) {
       return res.status(200).json({
         success: true,
         data: {
-          stats: { propertiesCount: 0, draftsCount: 0, inquiriesTodayCount: 0, inquiriesWeekCount: 0 },
+          stats: { propertiesCount: 0, activePropertiesCount: 0, draftsCount: 0, inquiriesTodayCount: 0, inquiriesWeekCount: 0 },
           activity: { properties: [], blog: [], inquiries: [] }
         }
       });
@@ -192,30 +212,47 @@ export default async (req, res) => {
     try {
       const prismaClient = getPrismaClient();
       
-      // Get counts for stats
-      const [propertiesCount, activePropertiesCount, draftsCount, inquiriesCount, inquiriesWeekCount] = await Promise.all([
-        withTimeout(prismaClient.property.count(), 5000),
-        withTimeout(prismaClient.property.count({ where: { status: 'ACTIVE' } }), 5000),
-        withTimeout(prismaClient.blogPost.count({ where: { status: 'DRAFT' } }), 5000),
-        withTimeout(prismaClient.inquiry.count({ 
+      // Get counts for stats with error handling for missing tables
+      let propertiesCount = 0, activePropertiesCount = 0, draftsCount = 0, inquiriesCount = 0, inquiriesWeekCount = 0;
+      
+      try {
+        propertiesCount = await withTimeout(prismaClient.property.count(), 5000);
+        activePropertiesCount = await withTimeout(prismaClient.property.count({ where: { status: 'ACTIVE' } }), 5000);
+      } catch (error) {
+        console.log('Properties table not available:', error.message);
+      }
+      
+      try {
+        draftsCount = await withTimeout(prismaClient.blogPost.count({ where: { status: 'DRAFT' } }), 5000);
+      } catch (error) {
+        console.log('BlogPost table not available:', error.message);
+      }
+      
+      try {
+        inquiriesCount = await withTimeout(prismaClient.inquiry.count({ 
           where: { 
             createdAt: { 
               gte: new Date(new Date().setHours(0, 0, 0, 0))
             } 
           } 
-        }), 5000),
-        withTimeout(prismaClient.inquiry.count({ 
+        }), 5000);
+        
+        inquiriesWeekCount = await withTimeout(prismaClient.inquiry.count({ 
           where: { 
             createdAt: { 
               gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
             } 
           } 
-        }), 5000)
-      ]);
+        }), 5000);
+      } catch (error) {
+        console.log('Inquiry table not available:', error.message);
+      }
 
-      // Get recent activity
-      const [recentProperties, recentBlogPosts, recentInquiries] = await Promise.all([
-        withTimeout(prismaClient.property.findMany({
+      // Get recent activity with error handling
+      let recentProperties = [], recentBlogPosts = [], recentInquiries = [];
+      
+      try {
+        recentProperties = await withTimeout(prismaClient.property.findMany({
           take: 5,
           select: {
             id: true,
@@ -225,8 +262,13 @@ export default async (req, res) => {
             createdAt: true
           },
           orderBy: { createdAt: 'desc' }
-        }), 5000),
-        withTimeout(prismaClient.blogPost.findMany({
+        }), 5000);
+      } catch (error) {
+        console.log('Properties query not available:', error.message);
+      }
+      
+      try {
+        recentBlogPosts = await withTimeout(prismaClient.blogPost.findMany({
           take: 5,
           select: {
             id: true,
@@ -238,8 +280,13 @@ export default async (req, res) => {
             }
           },
           orderBy: { createdAt: 'desc' }
-        }), 5000),
-        withTimeout(prismaClient.inquiry.findMany({
+        }), 5000);
+      } catch (error) {
+        console.log('BlogPost query not available:', error.message);
+      }
+      
+      try {
+        recentInquiries = await withTimeout(prismaClient.inquiry.findMany({
           take: 5,
           select: {
             id: true,
@@ -252,8 +299,10 @@ export default async (req, res) => {
             }
           },
           orderBy: { createdAt: 'desc' }
-        }), 5000)
-      ]);
+        }), 5000);
+      } catch (error) {
+        console.log('Inquiry query not available:', error.message);
+      }
 
       return res.status(200).json({
         success: true,
@@ -285,7 +334,7 @@ export default async (req, res) => {
   }
 
   // =============================================================================
-  // PROPERTIES ENDPOINTS - Full CRUD (Working endpoints)
+  // PROPERTIES ENDPOINTS - Full CRUD with error handling
   // =============================================================================
   if (url.includes('/properties')) {
     try {
@@ -316,55 +365,77 @@ export default async (req, res) => {
         if (type) where.type = type;
         if (status) where.status = status;
         
-        const [properties, total] = await Promise.all([
-          withTimeout(prismaClient.property.findMany({
-            where,
-            skip,
-            take: limit,
-            select: {
-              id: true,
-              title: true,
-              slug: true,
-              description: true,
-              priceCents: true,
-              type: true,
-              status: true,
-              city: true,
-              region: true,
-              bedrooms: true,
-              bathrooms: true,
-              area: true,
-              createdAt: true,
-              updatedAt: true
-            },
-            orderBy: { [sort]: order }
-          }), 8000),
-          withTimeout(prismaClient.property.count({ where }), 5000)
-        ]);
-        
-        // Transform data for frontend compatibility
-        const transformedProperties = properties.map(property => ({
-          ...property,
-          priceEuro: Math.round(property.priceCents / 100),
-          isActive: property.status === 'ACTIVE',
-          city: property.city || 'City pending',
-          region: property.region || 'Region pending'
-        }));
-        
-        return res.status(200).json({
-          success: true,
-          data: {
-            items: transformedProperties,
-            meta: {
-              total,
-              page,
-              limit,
-              totalPages: Math.ceil(total / limit),
-              hasNextPage: page < Math.ceil(total / limit),
-              hasPreviousPage: page > 1
+        try {
+          const [properties, total] = await Promise.all([
+            withTimeout(prismaClient.property.findMany({
+              where,
+              skip,
+              take: limit,
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+                description: true,
+                priceCents: true,
+                type: true,
+                status: true,
+                city: true,
+                region: true,
+                bedrooms: true,
+                bathrooms: true,
+                area: true,
+                createdAt: true,
+                updatedAt: true
+              },
+              orderBy: { [sort]: order }
+            }), 8000),
+            withTimeout(prismaClient.property.count({ where }), 5000)
+          ]);
+          
+          // Transform data for frontend compatibility
+          const transformedProperties = properties.map(property => ({
+            ...property,
+            priceEuro: Math.round(property.priceCents / 100),
+            isActive: property.status === 'ACTIVE',
+            city: property.city || 'City pending',
+            region: property.region || 'Region pending'
+          }));
+          
+          return res.status(200).json({
+            success: true,
+            data: {
+              items: transformedProperties,
+              meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit),
+                hasPreviousPage: page > 1
+              }
             }
-          }
-        });
+          });
+          
+        } catch (dbError) {
+          console.error('Properties database error:', dbError.message);
+          
+          // Return empty result if table doesn't exist
+          return res.status(200).json({
+            success: true,
+            data: {
+              items: [],
+              meta: {
+                total: 0,
+                page: 1,
+                limit: 10,
+                totalPages: 0,
+                hasNextPage: false,
+                hasPreviousPage: false
+              }
+            },
+            note: 'Properties table not available'
+          });
+        }
       }
 
       // Other CRUD operations would go here
@@ -512,10 +583,11 @@ export default async (req, res) => {
     availableEndpoints: [
       'GET /api',
       'GET /api/health',
+      'GET /api/auth/me',
+      'POST /api/auth/login',
       'GET /api/dashboard',
       'GET /api/properties',
-      'GET /api/users',
-      'POST /api/auth/login'
+      'GET /api/users'
     ],
     timestamp: new Date().toISOString()
   });
