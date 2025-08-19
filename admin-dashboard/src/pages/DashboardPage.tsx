@@ -180,10 +180,10 @@ export const DashboardPage: React.FC = () => {
       const properties = propertiesResponse.data.success ? propertiesResponse.data.data.items : []
       
       // Try to get users count
-      let usersCount = 0
       try {
         const usersResponse = await api.get('/users?limit=1')
-        usersCount = usersResponse.data.success ? usersResponse.data.data.meta?.total || 0 : 0
+        // Can be used for future dashboard stats if needed
+        console.log('Users available:', usersResponse.data.success ? usersResponse.data.data.meta?.total || 0 : 0)
       } catch (e) {
         console.log('Users endpoint not available')
       }
