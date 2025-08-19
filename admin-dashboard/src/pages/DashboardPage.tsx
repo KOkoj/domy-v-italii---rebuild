@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Building2, FileText, MessageSquare, Clock, TrendingUp, Calendar, Users, AlertCircle, Refresh } from 'lucide-react'
-import { api, normalizeError } from '@/lib/api'
+import { Building2, FileText, MessageSquare, TrendingUp, Calendar, Users, AlertCircle, RefreshCw } from 'lucide-react'
+import { api } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
 
