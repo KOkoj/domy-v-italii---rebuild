@@ -155,7 +155,7 @@ export const UsersPage: React.FC = () => {
       key: 'role',
       header: 'Role',
       sortable: true,
-      render: (value, item) => (
+      render: (value) => (
         <div className="flex items-center space-x-2">
           {getRoleIcon(value)}
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(value)}`}>
