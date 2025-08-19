@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Users, Mail, Calendar, Shield, Edit, User, Crown, Briefcase } from 'lucide-react'
+import { Mail, Calendar, Shield, Edit, User, Crown, Briefcase } from 'lucide-react'
 import { api, normalizeError } from '@/lib/api'
 import { DataTable, Column, PaginationMeta } from '@/components/ui/DataTable'
 import { Button } from '@/components/ui/Button'
