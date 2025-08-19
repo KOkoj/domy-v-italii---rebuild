@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { MessageSquare, Mail, Phone, Calendar, Building, Eye, Edit } from 'lucide-react'
+import { MessageSquare, Mail, Phone, Calendar, Building, Eye } from 'lucide-react'
 import { api, normalizeError } from '@/lib/api'
 import { DataTable, Column, PaginationMeta } from '@/components/ui/DataTable'
 import { Button } from '@/components/ui/Button'
