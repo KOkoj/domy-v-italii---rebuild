@@ -1,4 +1,4 @@
-// Italian Real Estate API with Database Connectivity - Updated
+// Italian Real Estate API with Database Connectivity - Complete
 import { PrismaClient } from '@prisma/client';
 
 // Helper function to create a fresh Prisma client for each request (avoids connection pooling issues)
@@ -20,6 +20,16 @@ const withTimeout = (promise, timeoutMs = 8000) => {
   return Promise.race([promise, timeout]);
 };
 
+// Parse request body helper
+const parseBody = (req) => {
+  if (req.method === 'POST' || req.method === 'PUT') {
+    if (req.body) {
+      return typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    }
+  }
+  return {};
+};
+
 export default async (req, res) => {
   console.log('Request:', req.method, req.url);
   
@@ -35,28 +45,19 @@ export default async (req, res) => {
     return res.status(200).end();
   }
   
-  // Parse JSON body for POST requests
-  let body = {};
-  if (req.method === 'POST' && req.body) {
-    try {
-      body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    } catch (e) {
-      body = req.body;
-    }
-  }
-  
   const url = req.url || '';
   const hasDatabase = !!process.env.DATABASE_URL;
+  const body = parseBody(req);
   
   // Root endpoint
   if (url === '/' || url === '/api') {
     return res.status(200).json({
       success: true,
-      message: 'Italian Real Estate API',
-      version: '1.0.0',
+      message: 'Italian Real Estate API - Complete',
+      version: '2.0.0',
       timestamp: new Date().toISOString(),
       database: hasDatabase ? 'Connected to Supabase' : 'No database configured',
-      endpoints: ['properties', 'auth/login', 'users', 'blog', 'health']
+      endpoints: ['dashboard', 'properties', 'blog', 'inquiries', 'users', 'settings', 'auth/login', 'health']
     });
   }
   
@@ -67,17 +68,13 @@ export default async (req, res) => {
     if (hasDatabase) {
       let prisma;
       try {
-        // Create fresh client for health check
         prisma = createPrismaClient();
-        
-        // Quick database health check with timeout
         await withTimeout(prisma.$queryRaw`SELECT 1`, 3000);
         dbStatus = 'Connected and healthy';
       } catch (error) {
         console.error('Database health check failed:', error.message);
         dbStatus = 'Connected but error: ' + error.message;
       } finally {
-        // Always disconnect
         if (prisma) await prisma.$disconnect();
       }
     }
@@ -89,153 +86,862 @@ export default async (req, res) => {
       timestamp: new Date().toISOString()
     });
   }
-  
-  // Properties endpoint with real database data
-  if (url.includes('/properties') && req.method === 'GET') {
+
+  // =============================================================================
+  // DASHBOARD ENDPOINT - Aggregates data for dashboard
+  // =============================================================================
+  if (url.includes('/dashboard') && req.method === 'GET') {
     if (!hasDatabase) {
-      // Fallback to test data if no database
-      const testProperties = [
-        {
-          id: 'test-001',
-          title: 'Villa in Tuscany (Test Data)',
-          price: 1250000,
-          location: 'Chianti, Tuscany',
-          bedrooms: 5,
-          bathrooms: 4,
-          status: 'active'
-        }
-      ];
-      
       return res.status(200).json({
         success: true,
         data: {
-          items: testProperties,
-          total: 1,
-          note: 'Test data - DATABASE_URL not configured'
-        },
-        timestamp: new Date().toISOString()
+          stats: { propertiesCount: 0, draftsCount: 0, inquiriesTodayCount: 0, inquiriesWeekCount: 0 },
+          activity: { properties: [], blog: [], inquiries: [] }
+        }
       });
     }
     
     let prisma;
     try {
-      console.log('Creating fresh Prisma client for properties...');
-      
-      // Create fresh client to avoid connection pooling issues
       prisma = createPrismaClient();
       
-      // Simple query first - just count all properties
-      console.log('Counting total properties...');
-      const totalProperties = await withTimeout(
-        prisma.property.count(),
-        5000
-      );
-      
-      console.log(`Database contains ${totalProperties} total properties`);
-      
-      if (totalProperties === 0) {
-        return res.status(200).json({
-          success: true,
-          data: {
-            items: [],
-            total: 0,
-            totalInDatabase: 0,
-            note: 'Database table exists but contains no properties'
-          },
-          timestamp: new Date().toISOString()
-        });
-      }
-      
-      // Get properties with simplified select (only basic fields)
-      console.log('Fetching properties with basic fields...');
-      const properties = await withTimeout(
-        prisma.property.findMany({
-          take: 10,
+      // Get counts for stats
+      const [propertiesCount, activePropertiesCount, draftsCount, inquiriesCount, inquiriesWeekCount] = await Promise.all([
+        withTimeout(prisma.property.count(), 5000),
+        withTimeout(prisma.property.count({ where: { status: 'ACTIVE' } }), 5000),
+        withTimeout(prisma.blogPost.count({ where: { status: 'DRAFT' } }), 5000),
+        withTimeout(prisma.inquiry.count({ 
+          where: { 
+            createdAt: { 
+              gte: new Date(new Date().setHours(0, 0, 0, 0))
+            } 
+          } 
+        }), 5000),
+        withTimeout(prisma.inquiry.count({ 
+          where: { 
+            createdAt: { 
+              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+            } 
+          } 
+        }), 5000)
+      ]);
+
+      // Get recent activity
+      const [recentProperties, recentBlogPosts, recentInquiries] = await Promise.all([
+        withTimeout(prisma.property.findMany({
+          take: 5,
           select: {
             id: true,
             title: true,
-            slug: true,
-            description: true,
-            priceCents: true,
+            city: true,
             type: true,
-            status: true,
-            bedrooms: true,
-            bathrooms: true,
-            area: true,
-            city: true,        // Add city field
-            region: true,      // Add region field  
             createdAt: true
           },
-          orderBy: {
-            createdAt: 'desc'
-          }
-        }),
-        8000
-      );
-      
-      console.log(`Retrieved ${properties.length} properties`);
-      
-      // Transform data for frontend compatibility
-      const transformedProperties = properties.map(property => ({
-        ...property,
-        priceEuro: property.priceCents ? Math.round(property.priceCents / 100) : 0, // Frontend expects priceEuro
-        propertyType: property.type,
-        isActive: property.status === 'ACTIVE', // Fix boolean calculation
-        city: property.city || 'City pending', // Use actual city or placeholder
-        region: property.region || 'Region pending' // Use actual region or placeholder
-      }));
-      
+          orderBy: { createdAt: 'desc' }
+        }), 5000),
+        withTimeout(prisma.blogPost.findMany({
+          take: 5,
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            createdAt: true,
+            author: {
+              select: { name: true }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        }), 5000),
+        withTimeout(prisma.inquiry.findMany({
+          take: 5,
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            status: true,
+            createdAt: true,
+            property: {
+              select: { title: true }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        }), 5000)
+      ]);
+
       return res.status(200).json({
         success: true,
         data: {
-          items: transformedProperties,
-          total: transformedProperties.length,
-          totalInDatabase: totalProperties,
-          source: 'Supabase Database (simplified query)',
-          debug: {
-            queryApproach: 'Fresh Prisma client + basic fields only',
-            fieldsUsed: ['id', 'title', 'slug', 'description', 'priceCents', 'type', 'status', 'bedrooms', 'bathrooms', 'area', 'city', 'region'],
-            connectionPoolingFix: 'Using fresh client per request'
+          stats: {
+            propertiesCount,
+            activePropertiesCount,
+            draftsCount,
+            inquiriesTodayCount: inquiriesCount,
+            inquiriesWeekCount
+          },
+          activity: {
+            properties: recentProperties,
+            blog: recentBlogPosts,
+            inquiries: recentInquiries
           }
         },
         timestamp: new Date().toISOString()
       });
       
     } catch (error) {
-      console.error('Properties query error:', error.message);
-      
-      return res.status(200).json({
-        success: true,
-        data: {
-          items: [],
-          total: 0,
-          error: error.message,
-          debug: {
-            errorType: error.constructor.name,
-            isPrismaError: error.code ? true : false,
-            prismaErrorCode: error.code || 'N/A',
-            connectionPoolingFix: 'Attempted fresh client creation',
-            suggestion: error.message.includes('prepared statement') ? 
-              'Connection pooling issue with PgBouncer - using fresh client should resolve this' :
-              'Database schema or connection issue'
-          }
-        },
-        timestamp: new Date().toISOString()
+      console.error('Dashboard error:', error.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to fetch dashboard data',
+        message: error.message
       });
     } finally {
-      // Always disconnect to avoid connection pooling issues
-      if (prisma) {
-        try {
-          await prisma.$disconnect();
-          console.log('Prisma client disconnected successfully');
-        } catch (e) {
-          console.log('Prisma disconnect warning:', e.message);
-        }
-      }
+      if (prisma) await prisma.$disconnect();
     }
   }
-  
-  // Authentication with real database
+
+  // =============================================================================
+  // PROPERTIES ENDPOINTS - Full CRUD
+  // =============================================================================
+  if (url.includes('/properties')) {
+    let prisma;
+    
+    try {
+      prisma = createPrismaClient();
+
+      // GET /properties - List with filters and pagination
+      if (req.method === 'GET' && !url.match(/\/properties\/[^\/]+$/)) {
+        const urlParams = new URL(url, 'http://localhost').searchParams;
+        const page = parseInt(urlParams.get('page') || '1');
+        const limit = parseInt(urlParams.get('limit') || '10');
+        const search = urlParams.get('search') || '';
+        const type = urlParams.get('type') || '';
+        const status = urlParams.get('status') || '';
+        const sort = urlParams.get('sort') || 'createdAt';
+        const order = urlParams.get('order') || 'desc';
+        
+        const skip = (page - 1) * limit;
+        
+        // Build where clause
+        const where = {};
+        if (search) {
+          where.OR = [
+            { title: { contains: search, mode: 'insensitive' } },
+            { description: { contains: search, mode: 'insensitive' } },
+            { city: { contains: search, mode: 'insensitive' } }
+          ];
+        }
+        if (type) where.type = type;
+        if (status) where.status = status;
+        
+        const [properties, total] = await Promise.all([
+          withTimeout(prisma.property.findMany({
+            where,
+            skip,
+            take: limit,
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              description: true,
+              priceCents: true,
+              type: true,
+              status: true,
+              city: true,
+              region: true,
+              bedrooms: true,
+              bathrooms: true,
+              area: true,
+              createdAt: true,
+              updatedAt: true
+            },
+            orderBy: { [sort]: order }
+          }), 8000),
+          withTimeout(prisma.property.count({ where }), 5000)
+        ]);
+        
+        const transformedProperties = properties.map(property => ({
+          ...property,
+          priceEuro: Math.round(property.priceCents / 100),
+          isActive: property.status === 'ACTIVE'
+        }));
+        
+        return res.status(200).json({
+          success: true,
+          data: {
+            items: transformedProperties,
+            meta: {
+              total,
+              page,
+              limit,
+              totalPages: Math.ceil(total / limit),
+              hasNextPage: page < Math.ceil(total / limit),
+              hasPreviousPage: page > 1
+            }
+          }
+        });
+      }
+
+      // GET /properties/:id - Get single property
+      if (req.method === 'GET' && url.match(/\/properties\/([^\/]+)$/)) {
+        const id = url.match(/\/properties\/([^\/]+)$/)[1];
+        
+        const property = await withTimeout(prisma.property.findUnique({
+          where: { id },
+          include: {
+            author: {
+              select: { id: true, name: true, email: true }
+            }
+          }
+        }), 5000);
+        
+        if (!property) {
+          return res.status(404).json({
+            success: false,
+            error: 'Property not found'
+          });
+        }
+        
+        return res.status(200).json({
+          success: true,
+          data: {
+            ...property,
+            priceEuro: Math.round(property.priceCents / 100),
+            isActive: property.status === 'ACTIVE'
+          }
+        });
+      }
+
+      // POST /properties - Create property
+      if (req.method === 'POST') {
+        const { title, description, priceCents, type, address, city, region, postalCode, bedrooms, bathrooms, area, lotSize, yearBuilt, features = [] } = body;
+        
+        // Generate slug from title
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        
+        // For demo, use a default author ID (first user in DB)
+        const firstUser = await withTimeout(prisma.user.findFirst(), 3000);
+        if (!firstUser) {
+          return res.status(400).json({
+            success: false,
+            error: 'No users found. Please create a user first.'
+          });
+        }
+        
+        const property = await withTimeout(prisma.property.create({
+          data: {
+            title,
+            slug,
+            description,
+            priceCents: parseInt(priceCents),
+            type,
+            address,
+            city,
+            region,
+            postalCode,
+            bedrooms: parseInt(bedrooms),
+            bathrooms: parseInt(bathrooms),
+            area: parseInt(area),
+            lotSize: lotSize ? parseInt(lotSize) : null,
+            yearBuilt: yearBuilt ? parseInt(yearBuilt) : null,
+            features,
+            images: [],
+            authorId: firstUser.id
+          },
+          include: {
+            author: {
+              select: { name: true, email: true }
+            }
+          }
+        }), 8000);
+        
+        return res.status(201).json({
+          success: true,
+          data: {
+            ...property,
+            priceEuro: Math.round(property.priceCents / 100)
+          },
+          message: 'Property created successfully'
+        });
+      }
+
+      // PUT /properties/:id - Update property
+      if (req.method === 'PUT' && url.match(/\/properties\/([^\/]+)$/)) {
+        const id = url.match(/\/properties\/([^\/]+)$/)[1];
+        
+        const updateData = { ...body };
+        if (updateData.priceCents) updateData.priceCents = parseInt(updateData.priceCents);
+        if (updateData.bedrooms) updateData.bedrooms = parseInt(updateData.bedrooms);
+        if (updateData.bathrooms) updateData.bathrooms = parseInt(updateData.bathrooms);
+        if (updateData.area) updateData.area = parseInt(updateData.area);
+        if (updateData.lotSize) updateData.lotSize = parseInt(updateData.lotSize);
+        if (updateData.yearBuilt) updateData.yearBuilt = parseInt(updateData.yearBuilt);
+        
+        delete updateData.id;
+        delete updateData.createdAt;
+        delete updateData.updatedAt;
+        delete updateData.author;
+        
+        const property = await withTimeout(prisma.property.update({
+          where: { id },
+          data: updateData,
+          include: {
+            author: {
+              select: { name: true, email: true }
+            }
+          }
+        }), 8000);
+        
+        return res.status(200).json({
+          success: true,
+          data: {
+            ...property,
+            priceEuro: Math.round(property.priceCents / 100)
+          },
+          message: 'Property updated successfully'
+        });
+      }
+
+      // DELETE /properties/:id - Delete property
+      if (req.method === 'DELETE' && url.match(/\/properties\/([^\/]+)$/)) {
+        const id = url.match(/\/properties\/([^\/]+)$/)[1];
+        
+        await withTimeout(prisma.property.delete({
+          where: { id }
+        }), 5000);
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Property deleted successfully'
+        });
+      }
+
+    } catch (error) {
+      console.error('Properties error:', error.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Properties operation failed',
+        message: error.message
+      });
+    } finally {
+      if (prisma) await prisma.$disconnect();
+    }
+  }
+
+  // =============================================================================
+  // BLOG ENDPOINTS - Full CRUD
+  // =============================================================================
+  if (url.includes('/blog')) {
+    let prisma;
+    
+    try {
+      prisma = createPrismaClient();
+
+      // GET /blog - List posts with filters
+      if (req.method === 'GET' && !url.match(/\/blog\/[^\/]+$/)) {
+        const urlParams = new URL(url, 'http://localhost').searchParams;
+        const page = parseInt(urlParams.get('page') || '1');
+        const limit = parseInt(urlParams.get('limit') || '10');
+        const status = urlParams.get('status') || '';
+        const search = urlParams.get('search') || '';
+        
+        const skip = (page - 1) * limit;
+        
+        const where = {};
+        if (status) where.status = status.toUpperCase();
+        if (search) {
+          where.OR = [
+            { title: { contains: search, mode: 'insensitive' } },
+            { content: { contains: search, mode: 'insensitive' } }
+          ];
+        }
+        
+        const [posts, total] = await Promise.all([
+          withTimeout(prisma.blogPost.findMany({
+            where,
+            skip,
+            take: limit,
+            include: {
+              author: {
+                select: { id: true, name: true, email: true }
+              }
+            },
+            orderBy: { createdAt: 'desc' }
+          }), 8000),
+          withTimeout(prisma.blogPost.count({ where }), 5000)
+        ]);
+        
+        return res.status(200).json({
+          success: true,
+          data: {
+            items: posts,
+            meta: {
+              total,
+              page,
+              limit,
+              totalPages: Math.ceil(total / limit)
+            }
+          }
+        });
+      }
+
+      // GET /blog/:id - Get single post
+      if (req.method === 'GET' && url.match(/\/blog\/([^\/]+)$/)) {
+        const id = url.match(/\/blog\/([^\/]+)$/)[1];
+        
+        const post = await withTimeout(prisma.blogPost.findUnique({
+          where: { id },
+          include: {
+            author: {
+              select: { id: true, name: true, email: true }
+            }
+          }
+        }), 5000);
+        
+        if (!post) {
+          return res.status(404).json({
+            success: false,
+            error: 'Blog post not found'
+          });
+        }
+        
+        return res.status(200).json({
+          success: true,
+          data: post
+        });
+      }
+
+      // POST /blog - Create post
+      if (req.method === 'POST') {
+        const { title, content, status = 'DRAFT', coverImage = null } = body;
+        
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        
+        const firstUser = await withTimeout(prisma.user.findFirst(), 3000);
+        if (!firstUser) {
+          return res.status(400).json({
+            success: false,
+            error: 'No users found. Please create a user first.'
+          });
+        }
+        
+        const post = await withTimeout(prisma.blogPost.create({
+          data: {
+            title,
+            slug,
+            content,
+            status: status.toUpperCase(),
+            coverImage,
+            authorId: firstUser.id
+          },
+          include: {
+            author: {
+              select: { name: true, email: true }
+            }
+          }
+        }), 8000);
+        
+        return res.status(201).json({
+          success: true,
+          data: post,
+          message: 'Blog post created successfully'
+        });
+      }
+
+      // PUT /blog/:id - Update post
+      if (req.method === 'PUT' && url.match(/\/blog\/([^\/]+)$/)) {
+        const id = url.match(/\/blog\/([^\/]+)$/)[1];
+        
+        const updateData = { ...body };
+        if (updateData.status) updateData.status = updateData.status.toUpperCase();
+        
+        delete updateData.id;
+        delete updateData.createdAt;
+        delete updateData.updatedAt;
+        delete updateData.author;
+        
+        const post = await withTimeout(prisma.blogPost.update({
+          where: { id },
+          data: updateData,
+          include: {
+            author: {
+              select: { name: true, email: true }
+            }
+          }
+        }), 8000);
+        
+        return res.status(200).json({
+          success: true,
+          data: post,
+          message: 'Blog post updated successfully'
+        });
+      }
+
+      // DELETE /blog/:id - Delete post
+      if (req.method === 'DELETE' && url.match(/\/blog\/([^\/]+)$/)) {
+        const id = url.match(/\/blog\/([^\/]+)$/)[1];
+        
+        await withTimeout(prisma.blogPost.delete({
+          where: { id }
+        }), 5000);
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Blog post deleted successfully'
+        });
+      }
+
+    } catch (error) {
+      console.error('Blog error:', error.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Blog operation failed',
+        message: error.message
+      });
+    } finally {
+      if (prisma) await prisma.$disconnect();
+    }
+  }
+
+  // =============================================================================
+  // INQUIRIES ENDPOINTS - Full CRUD
+  // =============================================================================
+  if (url.includes('/inquiries')) {
+    let prisma;
+    
+    try {
+      prisma = createPrismaClient();
+
+      // GET /inquiries - List with filters
+      if (req.method === 'GET' && !url.match(/\/inquiries\/[^\/]+$/)) {
+        const urlParams = new URL(url, 'http://localhost').searchParams;
+        const page = parseInt(urlParams.get('page') || '1');
+        const limit = parseInt(urlParams.get('limit') || '10');
+        const status = urlParams.get('status') || '';
+        const search = urlParams.get('search') || '';
+        
+        const skip = (page - 1) * limit;
+        
+        const where = {};
+        if (status) where.status = status.toUpperCase();
+        if (search) {
+          where.OR = [
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+            { message: { contains: search, mode: 'insensitive' } }
+          ];
+        }
+        
+        const [inquiries, total] = await Promise.all([
+          withTimeout(prisma.inquiry.findMany({
+            where,
+            skip,
+            take: limit,
+            include: {
+              property: {
+                select: { id: true, title: true, city: true }
+              }
+            },
+            orderBy: { createdAt: 'desc' }
+          }), 8000),
+          withTimeout(prisma.inquiry.count({ where }), 5000)
+        ]);
+        
+        return res.status(200).json({
+          success: true,
+          data: {
+            items: inquiries,
+            meta: {
+              total,
+              page,
+              limit,
+              totalPages: Math.ceil(total / limit)
+            }
+          }
+        });
+      }
+
+      // GET /inquiries/:id - Get single inquiry
+      if (req.method === 'GET' && url.match(/\/inquiries\/([^\/]+)$/)) {
+        const id = url.match(/\/inquiries\/([^\/]+)$/)[1];
+        
+        const inquiry = await withTimeout(prisma.inquiry.findUnique({
+          where: { id },
+          include: {
+            property: {
+              select: { id: true, title: true, city: true, region: true }
+            }
+          }
+        }), 5000);
+        
+        if (!inquiry) {
+          return res.status(404).json({
+            success: false,
+            error: 'Inquiry not found'
+          });
+        }
+        
+        return res.status(200).json({
+          success: true,
+          data: inquiry
+        });
+      }
+
+      // POST /inquiries - Create inquiry
+      if (req.method === 'POST') {
+        const { name, email, phone = null, message, propertyId = null } = body;
+        
+        const inquiry = await withTimeout(prisma.inquiry.create({
+          data: {
+            name,
+            email,
+            phone,
+            message,
+            propertyId
+          },
+          include: {
+            property: {
+              select: { title: true, city: true }
+            }
+          }
+        }), 8000);
+        
+        return res.status(201).json({
+          success: true,
+          data: inquiry,
+          message: 'Inquiry created successfully'
+        });
+      }
+
+      // PUT /inquiries/:id - Update inquiry (mainly status)
+      if (req.method === 'PUT' && url.match(/\/inquiries\/([^\/]+)$/)) {
+        const id = url.match(/\/inquiries\/([^\/]+)$/)[1];
+        
+        const updateData = { ...body };
+        if (updateData.status) updateData.status = updateData.status.toUpperCase();
+        
+        delete updateData.id;
+        delete updateData.createdAt;
+        delete updateData.property;
+        
+        const inquiry = await withTimeout(prisma.inquiry.update({
+          where: { id },
+          data: updateData,
+          include: {
+            property: {
+              select: { title: true, city: true }
+            }
+          }
+        }), 8000);
+        
+        return res.status(200).json({
+          success: true,
+          data: inquiry,
+          message: 'Inquiry updated successfully'
+        });
+      }
+
+      // DELETE /inquiries/:id - Delete inquiry
+      if (req.method === 'DELETE' && url.match(/\/inquiries\/([^\/]+)$/)) {
+        const id = url.match(/\/inquiries\/([^\/]+)$/)[1];
+        
+        await withTimeout(prisma.inquiry.delete({
+          where: { id }
+        }), 5000);
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Inquiry deleted successfully'
+        });
+      }
+
+    } catch (error) {
+      console.error('Inquiries error:', error.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Inquiries operation failed',
+        message: error.message
+      });
+    } finally {
+      if (prisma) await prisma.$disconnect();
+    }
+  }
+
+  // =============================================================================
+  // USERS ENDPOINTS - List and role management
+  // =============================================================================
+  if (url.includes('/users')) {
+    let prisma;
+    
+    try {
+      prisma = createPrismaClient();
+
+      // GET /users - List users
+      if (req.method === 'GET' && !url.match(/\/users\/[^\/]+$/)) {
+        const urlParams = new URL(url, 'http://localhost').searchParams;
+        const page = parseInt(urlParams.get('page') || '1');
+        const limit = parseInt(urlParams.get('limit') || '10');
+        const role = urlParams.get('role') || '';
+        const search = urlParams.get('search') || '';
+        
+        const skip = (page - 1) * limit;
+        
+        const where = {};
+        if (role) where.role = role.toUpperCase();
+        if (search) {
+          where.OR = [
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } }
+          ];
+        }
+        
+        const [users, total] = await Promise.all([
+          withTimeout(prisma.user.findMany({
+            where,
+            skip,
+            take: limit,
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              role: true,
+              isActive: true,
+              createdAt: true,
+              updatedAt: true,
+              avatar: true
+            },
+            orderBy: { createdAt: 'desc' }
+          }), 8000),
+          withTimeout(prisma.user.count({ where }), 5000)
+        ]);
+        
+        return res.status(200).json({
+          success: true,
+          data: {
+            items: users,
+            meta: {
+              total,
+              page,
+              limit,
+              totalPages: Math.ceil(total / limit)
+            }
+          }
+        });
+      }
+
+      // PUT /users/:id - Update user (mainly role)
+      if (req.method === 'PUT' && url.match(/\/users\/([^\/]+)$/)) {
+        const id = url.match(/\/users\/([^\/]+)$/)[1];
+        
+        const updateData = { ...body };
+        if (updateData.role) updateData.role = updateData.role.toUpperCase();
+        
+        delete updateData.id;
+        delete updateData.password; // Don't allow password updates through this endpoint
+        delete updateData.createdAt;
+        delete updateData.updatedAt;
+        
+        const user = await withTimeout(prisma.user.update({
+          where: { id },
+          data: updateData,
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+            avatar: true
+          }
+        }), 8000);
+        
+        return res.status(200).json({
+          success: true,
+          data: user,
+          message: 'User updated successfully'
+        });
+      }
+
+    } catch (error) {
+      console.error('Users error:', error.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Users operation failed',
+        message: error.message
+      });
+    } finally {
+      if (prisma) await prisma.$disconnect();
+    }
+  }
+
+  // =============================================================================
+  // SETTINGS ENDPOINTS - App configuration
+  // =============================================================================
+  if (url.includes('/settings')) {
+    let prisma;
+    
+    try {
+      prisma = createPrismaClient();
+
+      // GET /settings - Get all settings
+      if (req.method === 'GET') {
+        const settings = await withTimeout(prisma.setting.findMany(), 5000);
+        
+        // Convert to key-value object
+        const settingsObj = {};
+        settings.forEach(setting => {
+          settingsObj[setting.key] = setting.value;
+        });
+        
+        // Provide defaults if settings don't exist
+        const defaultSettings = {
+          siteName: 'Italian Real Estate',
+          contactEmail: 'admin@example.com',
+          currency: 'EUR',
+          locale: 'it-IT',
+          ...settingsObj
+        };
+        
+        return res.status(200).json({
+          success: true,
+          data: defaultSettings
+        });
+      }
+
+      // PUT /settings - Update settings
+      if (req.method === 'PUT') {
+        const updates = body;
+        
+        // Update each setting
+        for (const [key, value] of Object.entries(updates)) {
+          await withTimeout(prisma.setting.upsert({
+            where: { key },
+            update: { value },
+            create: { key, value }
+          }), 5000);
+        }
+        
+        return res.status(200).json({
+          success: true,
+          message: 'Settings updated successfully'
+        });
+      }
+
+    } catch (error) {
+      console.error('Settings error:', error.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Settings operation failed',
+        message: error.message
+      });
+    } finally {
+      if (prisma) await prisma.$disconnect();
+    }
+  }
+
+  // =============================================================================
+  // AUTHENTICATION ENDPOINT
+  // =============================================================================
   if (url.includes('/auth/login') && req.method === 'POST') {
     const { email, password } = body;
     
@@ -247,12 +953,11 @@ export default async (req, res) => {
     }
     
     if (!hasDatabase) {
-      // Fallback authentication for testing
       if (email === 'admin@example.com' && password === 'admin123456') {
         return res.status(200).json({
           success: true,
           data: {
-            user: { id: 'test-admin', email, name: 'Test Admin' },
+            user: { id: 'test-admin', email, name: 'Test Admin', role: 'ADMIN' },
             token: 'test-token-' + Date.now()
           },
           note: 'Test authentication - no database'
@@ -265,10 +970,8 @@ export default async (req, res) => {
     try {
       console.log('Authenticating user:', email);
       
-      // Create fresh Prisma client for authentication
       prisma = createPrismaClient();
       
-      // Find user in database with timeout
       const user = await withTimeout(
         prisma.user.findUnique({
           where: { email },
@@ -276,36 +979,26 @@ export default async (req, res) => {
             id: true,
             email: true,
             name: true,
-            password: true, // We'll need this for comparison
+            password: true,
             role: true,
             isActive: true,
             createdAt: true,
             avatar: true
           }
         }),
-        5000 // 5 second timeout
+        5000
       );
       
-      if (!user) {
-        console.log('User not found');
+      if (!user || !user.isActive) {
         return res.status(401).json({
           success: false,
           error: 'Invalid credentials'
         });
       }
       
-      if (!user.isActive) {
-        return res.status(401).json({
-          success: false,
-          error: 'Account is deactivated'
-        });
-      }
-      
       // For demo purposes, we'll skip password hashing comparison
-      // In production, you'd use bcrypt here
       console.log('User found:', user.email);
       
-      // Remove password from response
       const { password: _, ...safeUser } = user;
       
       return res.status(200).json({
@@ -316,277 +1009,18 @@ export default async (req, res) => {
           refreshToken: 'refresh-token-' + Date.now(),
           expiresIn: '7d'
         },
-        message: 'Login successful',
-        timestamp: new Date().toISOString()
+        message: 'Login successful'
       });
       
     } catch (error) {
       console.error('Authentication error:', error.message);
-      
       return res.status(500).json({
         success: false,
         error: 'Authentication failed',
-        message: error.message,
-        timestamp: new Date().toISOString()
-      });
-    } finally {
-      // Always disconnect to avoid connection pooling issues
-      if (prisma) {
-        try {
-          await prisma.$disconnect();
-          console.log('Auth Prisma client disconnected successfully');
-        } catch (e) {
-          console.log('Auth Prisma disconnect warning:', e.message);
-        }
-      }
-    }
-  }
-  
-  // Users endpoint with database
-  if (url.includes('/users') && req.method === 'GET') {
-    if (!hasDatabase) {
-      return res.status(200).json({
-        success: true,
-        data: { items: [], total: 0, note: 'No database configured' }
-      });
-    }
-    
-    let prisma;
-    try {
-      prisma = createPrismaClient();
-      
-      const users = await withTimeout(
-        prisma.user.findMany({
-          take: 10,
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true,
-            isActive: true,
-            createdAt: true,
-            avatar: true
-          },
-          orderBy: {
-            createdAt: 'desc'
-          }
-        }),
-        5000
-      );
-      
-      return res.status(200).json({
-        success: true,
-        data: {
-          items: users,
-          total: users.length
-        },
-        timestamp: new Date().toISOString()
-      });
-      
-    } catch (error) {
-      console.error('Users query error:', error.message);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to fetch users',
         message: error.message
       });
     } finally {
-      if (prisma) {
-        try {
-          await prisma.$disconnect();
-        } catch (e) {
-          console.log('Users Prisma disconnect warning:', e.message);
-        }
-      }
-    }
-  }
-  
-  // Blog posts with database
-  if (url.includes('/blog') && req.method === 'GET') {
-    if (!hasDatabase) {
-      return res.status(200).json({
-        success: true,
-        data: { items: [], total: 0, note: 'No database configured' }
-      });
-    }
-    
-    let prisma;
-    try {
-      prisma = createPrismaClient();
-      
-      const posts = await withTimeout(
-        prisma.blogPost.findMany({
-          take: 10,
-          where: {
-            isPublished: true
-          },
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-            excerpt: true,
-            content: true,
-            publishedAt: true,
-            isPublished: true,
-            author: {
-              select: {
-                name: true,
-                email: true
-              }
-            }
-          },
-          orderBy: {
-            publishedAt: 'desc'
-          }
-        }),
-        5000
-      );
-      
-      return res.status(200).json({
-        success: true,
-        data: {
-          items: posts,
-          total: posts.length
-        },
-        timestamp: new Date().toISOString()
-      });
-      
-    } catch (error) {
-      console.error('Blog query error:', error.message);
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to fetch blog posts',
-        message: error.message
-      });
-    } finally {
-      if (prisma) {
-        try {
-          await prisma.$disconnect();
-        } catch (e) {
-          console.log('Blog Prisma disconnect warning:', e.message);
-        }
-      }
-    }
-  }
-  
-  // Seed properties endpoint (for testing)
-  if (url.includes('/seed/properties') && req.method === 'POST') {
-    if (!hasDatabase) {
-      return res.status(400).json({
-        success: false,
-        error: 'Database not configured'
-      });
-    }
-    
-    let prisma;
-    try {
-      console.log('Creating seed properties...');
-      prisma = createPrismaClient();
-      
-      const testProperties = [
-        {
-          title: 'Elegant Villa in Tuscany',
-          slug: 'elegant-villa-tuscany',
-          description: 'Beautiful countryside villa with vineyard views in the heart of Chianti region',
-          priceCents: 125000000, // €1,250,000
-          type: 'villa',
-          status: 'active',
-          bedrooms: 5,
-          bathrooms: 4,
-          area: 320,
-          address: 'Via del Chianti 123',
-          city: 'Greve in Chianti',
-          region: 'Tuscany',
-          postalCode: '50022',
-          yearBuilt: 1850,
-          lotSize: 5000,
-          features: ['Swimming Pool', 'Wine Cellar', 'Garden', 'Parking', 'Fireplace']
-        },
-        {
-          title: 'Modern Apartment in Milan Center',
-          slug: 'modern-apartment-milan-center',
-          description: 'Luxury apartment in the prestigious Brera district with contemporary amenities',
-          priceCents: 85000000, // €850,000
-          type: 'apartment',
-          status: 'active',
-          bedrooms: 3,
-          bathrooms: 2,
-          area: 150,
-          address: 'Via Brera 45',
-          city: 'Milan',
-          region: 'Lombardy',
-          postalCode: '20121',
-          yearBuilt: 2020,
-          features: ['Elevator', 'Balcony', 'Air Conditioning', 'Modern Kitchen']
-        },
-        {
-          title: 'Historic Palazzo in Rome',
-          slug: 'historic-palazzo-rome',
-          description: 'Restored 17th century palazzo near the Colosseum with original frescoes',
-          priceCents: 210000000, // €2,100,000
-          type: 'palazzo',
-          status: 'active',
-          bedrooms: 6,
-          bathrooms: 5,
-          area: 450,
-          address: 'Via dei Fori Imperiali 87',
-          city: 'Rome',
-          region: 'Lazio',
-          postalCode: '00184',
-          yearBuilt: 1650,
-          features: ['Historic Features', 'Terrace', 'Original Frescoes', 'Courtyard', 'Wine Cellar']
-        }
-      ];
-      
-      // Insert properties one by one
-      const createdProperties = [];
-      for (const property of testProperties) {
-        const created = await withTimeout(
-          prisma.property.create({
-            data: property
-          }),
-          10000
-        );
-        createdProperties.push(created);
-        console.log(`Created property: ${created.title}`);
-      }
-      
-      return res.status(200).json({
-        success: true,
-        data: {
-          message: 'Test properties created successfully',
-          created: createdProperties.length,
-          properties: createdProperties.map(p => ({
-            id: p.id,
-            title: p.title,
-            price: Math.round(p.priceCents / 100),
-            location: `${p.city}, ${p.region}`
-          }))
-        },
-        timestamp: new Date().toISOString()
-      });
-      
-    } catch (error) {
-      console.error('Seed properties error:', error.message);
-      
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to create test properties',
-        message: error.message,
-        debug: {
-          errorType: error.constructor.name,
-          isPrismaError: error.code ? true : false,
-          prismaErrorCode: error.code || 'N/A'
-        }
-      });
-    } finally {
-      if (prisma) {
-        try {
-          await prisma.$disconnect();
-        } catch (e) {
-          console.log('Disconnect warning:', e.message);
-        }
-      }
+      if (prisma) await prisma.$disconnect();
     }
   }
   
@@ -597,13 +1031,15 @@ export default async (req, res) => {
     path: url,
     method: req.method,
     availableEndpoints: [
-      'GET /',
+      'GET /api',
       'GET /api/health',
-      'GET /api/properties',
-      'POST /api/auth/login',
-      'GET /api/users',
-      'GET /api/blog',
-      'POST /api/seed/properties (for testing)'
+      'GET /api/dashboard',
+      'GET,POST,PUT,DELETE /api/properties',
+      'GET,POST,PUT,DELETE /api/blog', 
+      'GET,POST,PUT,DELETE /api/inquiries',
+      'GET,PUT /api/users',
+      'GET,PUT /api/settings',
+      'POST /api/auth/login'
     ],
     timestamp: new Date().toISOString()
   });
