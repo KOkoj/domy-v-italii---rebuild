@@ -328,7 +328,7 @@ export const DashboardPage: React.FC = () => {
             onClick={fetchDashboardData}
             className="mr-3"
           >
-            <Refresh className="w-4 h-4 mr-2" />
+            <RefreshCw className="w-4 h-4 mr-2" />
             Try Again
           </Button>
         </div>
