@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Edit, Trash2, Eye, Calendar, User, FileText } from 'lucide-react'
+import { Plus, Edit, Trash2, Calendar, User } from 'lucide-react'
 import { api, normalizeError } from '@/lib/api'
 import { DataTable, Column, PaginationMeta } from '@/components/ui/DataTable'
 import { Button } from '@/components/ui/Button'
