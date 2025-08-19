@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Settings, Save, Globe, Mail, DollarSign, MapPin, Palette, Bell } from 'lucide-react'
+import { Settings, Save, Globe, MapPin, Palette, Bell } from 'lucide-react'
 import { api, normalizeError } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
