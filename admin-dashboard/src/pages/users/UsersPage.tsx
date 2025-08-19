@@ -119,6 +119,7 @@ export const UsersPage: React.FC = () => {
   const canEditUser = (user: User, currentUserRole: string = 'ADMIN') => {
     // For demo purposes, assume current user is admin
     // In real app, you'd get this from auth context
+    // Use user parameter for role checking
     if (currentUserRole === 'ADMIN') return true
     if (currentUserRole === 'MANAGER' && user.role === 'EMPLOYEE') return true
     return false
