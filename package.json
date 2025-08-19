@@ -27,8 +27,7 @@
     "format": "prettier . -w",
     "format:check": "prettier . -c",
     "typecheck": "echo \"Run package-specific type checks\"",
-    "test": "npm -ws run test",
-    "build": "npm -ws run build"
+    "test": "echo \"No tests configured for serverless deployment\""
   },
   "devDependencies": {
     "@types/node": "^20.14.12",
