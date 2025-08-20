@@ -29,7 +29,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
           {isDashboard ? (
             <div>
               <h1 className="text-lg font-bold text-gray-900 truncate">Dashboard Overview</h1>
-              <p className="text-xs text-gray-600 truncate">Welcome back! Here's what's happening with your properties.</p>
+              <p className="text-xs text-gray-600 truncate">
+                Welcome back! Here's what's happening with your properties.
+              </p>
             </div>
           ) : (
             <h1 className="text-lg font-semibold text-gray-900 truncate">{appName}</h1>
@@ -86,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                     <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                     <p className="text-sm text-gray-500">{user?.email}</p>
                     <p className="text-xs text-gray-400 capitalize">
-                      {user?.role.toLowerCase()}
+                      {user?.role ? user.role.toLowerCase() : 'user'}
                     </p>
                   </div>
 
