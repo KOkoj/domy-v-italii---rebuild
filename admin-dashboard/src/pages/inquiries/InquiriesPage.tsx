@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
 import toast from 'react-hot-toast'
+import { isAxiosError } from 'axios' // ✅ added
 
 interface Inquiry {
   id: string
@@ -48,23 +49,23 @@ export const InquiriesPage: React.FC = () => {
         })
 
         const response = await api.get(`/inquiries?${params}`)
-        
+
         // Handle 501 Not Implemented response
         if (response.status === 501) {
           return { items: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } }
         }
-        
-        if (response.data.success) {
+
+        if (response.data?.success) {
           return response.data.data as InquiriesResponse
         }
-        throw new Error(response.data.message || 'Failed to fetch inquiries')
-      } catch (error) {
-        // Handle 501 errors gracefully
-        if (error.response?.status === 501) {
+        throw new Error(response.data?.message || 'Failed to fetch inquiries')
+      } catch (error: unknown) { // ✅ typed
+        // Handle 501 errors gracefully (only if Axios error)
+        if (isAxiosError(error) && error.response?.status === 501) {
           console.log('Inquiries endpoint not yet implemented')
           return { items: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } }
         }
-        
+
         const normalizedError = normalizeError(error)
         toast.error(normalizedError.message)
         throw error
@@ -72,21 +73,21 @@ export const InquiriesPage: React.FC = () => {
     },
   })
 
-  const handleStatusUpdate = async (id: string, newStatus: string) => {
+  const handleStatusUpdate = async (id: string, newStatus: Inquiry['status']) => {
     try {
       setIsUpdatingStatus(true)
       const response = await api.put(`/inquiries/${id}`, { status: newStatus })
-      
-      if (response.data.success) {
+
+      if (response.data?.success) {
         toast.success('Inquiry status updated successfully')
         refetch()
         if (selectedInquiry?.id === id) {
-          setSelectedInquiry({ ...selectedInquiry, status: newStatus as any })
+          setSelectedInquiry({ ...selectedInquiry, status: newStatus })
         }
       } else {
-        throw new Error(response.data.message || 'Failed to update inquiry status')
+        throw new Error(response.data?.message || 'Failed to update inquiry status')
       }
-    } catch (error) {
+    } catch (error: unknown) { // ✅ typed
       const normalizedError = normalizeError(error)
       toast.error(normalizedError.message)
     } finally {
@@ -94,7 +95,7 @@ export const InquiriesPage: React.FC = () => {
     }
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: Inquiry['status']) => {
     switch (status) {
       case 'NEW':
         return 'bg-blue-100 text-blue-800'
@@ -169,7 +170,7 @@ export const InquiriesPage: React.FC = () => {
           </span>
           <Select
             value={value}
-            onChange={(e) => handleStatusUpdate(item.id, e.target.value)}
+            onChange={(e) => handleStatusUpdate(item.id, e.target.value as Inquiry['status'])} // ✅ cast
             options={[
               { value: 'NEW', label: 'New' },
               { value: 'IN_PROGRESS', label: 'In Progress' },
@@ -329,7 +330,7 @@ export const InquiriesPage: React.FC = () => {
             <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
               <Select
                 value={selectedInquiry.status}
-                onChange={(e) => handleStatusUpdate(selectedInquiry.id, e.target.value)}
+                onChange={(e) => handleStatusUpdate(selectedInquiry.id, e.target.value as Inquiry['status'])} // ✅ cast
                 options={[
                   { value: 'NEW', label: 'Mark as New' },
                   { value: 'IN_PROGRESS', label: 'Mark as In Progress' },
