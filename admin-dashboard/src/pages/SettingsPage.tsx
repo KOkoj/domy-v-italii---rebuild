@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import toast from 'react-hot-toast'
+import { isAxiosError } from 'axios' // ✅ added
 
 interface AppSettings {
   siteName: string
@@ -41,13 +42,13 @@ export const SettingsPage: React.FC = () => {
           }
         }
         
-        if (response.data.success) {
+        if (response.data?.success) {
           return response.data.data as AppSettings
         }
-        throw new Error(response.data.message || 'Failed to fetch settings')
-      } catch (error) {
-        // Handle 501 errors gracefully
-        if (error.response?.status === 501) {
+        throw new Error(response.data?.message || 'Failed to fetch settings')
+      } catch (error: unknown) { // ✅ typed
+        // Handle 501 errors gracefully (only if it's an Axios error)
+        if (isAxiosError(error) && error.response?.status === 501) {
           console.log('Settings endpoint not yet implemented')
           return {
             siteName: 'Italian Real Estate',
@@ -83,14 +84,14 @@ export const SettingsPage: React.FC = () => {
       setIsLoading(true)
       const response = await api.put('/settings', formData)
 
-      if (response.data.success) {
+      if (response.data?.success) {
         toast.success('Settings updated successfully')
         setHasChanges(false)
         refetch()
       } else {
-        throw new Error(response.data.message || 'Failed to update settings')
+        throw new Error(response.data?.message || 'Failed to update settings')
       }
-    } catch (error) {
+    } catch (error: unknown) { // ✅ typed
       const normalizedError = normalizeError(error)
       toast.error(normalizedError.message)
     } finally {
