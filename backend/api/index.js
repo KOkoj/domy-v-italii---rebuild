@@ -926,7 +926,14 @@ export default async (req, res) => {
       'POST /api/auth/login',
       'GET /api/dashboard',
       'GET /api/properties',
-      'GET /api/users'
+      'GET /api/users',
+      'GET /api/blog',
+      'PUT /api/blog/{id}',
+      'DELETE /api/blog/{id}',
+      'GET /api/inquiries',
+      'PUT /api/inquiries/{id}',
+      'GET /api/settings',
+      'PUT /api/settings'
     ],
     timestamp: new Date().toISOString()
   });
