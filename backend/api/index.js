@@ -60,10 +60,10 @@ export default async (req, res) => {
     return res.status(200).json({
       success: true,
       message: 'Italian Real Estate API - Production Ready',
-      version: '2.2.0',
+      version: '2.3.0',
       timestamp: new Date().toISOString(),
       database: hasDatabase ? 'Connected to Supabase' : 'No database configured',
-      endpoints: ['health', 'auth/login', 'auth/me', 'dashboard', 'properties', 'users']
+      endpoints: ['health', 'auth/login', 'auth/me', 'dashboard', 'properties', 'users', 'blog', 'inquiries', 'settings']
     });
   }
   
