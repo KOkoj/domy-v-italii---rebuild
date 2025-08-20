@@ -49,7 +49,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const response = await api.get('/auth/me')
 
           if (response.data.success) {
-            setUser(response.data.data)
+            setUser(response.data.data.user || response.data.data)
           } else {
             // Invalid token, clear auth
             clearAuthData()
