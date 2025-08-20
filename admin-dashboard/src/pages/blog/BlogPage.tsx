@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { ConfirmDialog } from '@/components/ui/Modal'
 import toast from 'react-hot-toast'
+import { isAxiosError } from 'axios' // ✅ added
 
 interface BlogPost {
   id: string
@@ -56,13 +57,13 @@ export const BlogPage: React.FC = () => {
           return { items: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } }
         }
         
-        if (response.data.success) {
+        if (response.data?.success) {
           return response.data.data as BlogResponse
         }
-        throw new Error(response.data.message || 'Failed to fetch blog posts')
-      } catch (error) {
-        // Handle 501 errors gracefully
-        if (error.response?.status === 501) {
+        throw new Error(response.data?.message || 'Failed to fetch blog posts')
+      } catch (error: unknown) { // ✅ typed
+        // Handle 501 errors gracefully (only if Axios error)
+        if (isAxiosError(error) && error.response?.status === 501) {
           console.log('Blog endpoint not yet implemented')
           return { items: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } }
         }
@@ -78,13 +79,13 @@ export const BlogPage: React.FC = () => {
     try {
       setIsDeleting(true)
       const response = await api.delete(`/blog/${id}`)
-      if (response.data.success) {
+      if (response.data?.success) {
         toast.success('Blog post deleted successfully')
         refetch()
       } else {
-        throw new Error(response.data.message || 'Failed to delete blog post')
+        throw new Error(response.data?.message || 'Failed to delete blog post')
       }
-    } catch (error) {
+    } catch (error: unknown) { // ✅ typed
       const normalizedError = normalizeError(error)
       toast.error(normalizedError.message)
     } finally {
@@ -98,13 +99,13 @@ export const BlogPage: React.FC = () => {
       const newStatus = currentStatus === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED'
       const response = await api.put(`/blog/${id}`, { status: newStatus })
       
-      if (response.data.success) {
+      if (response.data?.success) {
         toast.success(`Post ${newStatus.toLowerCase()} successfully`)
         refetch()
       } else {
-        throw new Error(response.data.message || 'Failed to update post status')
+        throw new Error(response.data?.message || 'Failed to update post status')
       }
-    } catch (error) {
+    } catch (error: unknown) { // ✅ typed
       const normalizedError = normalizeError(error)
       toast.error(normalizedError.message)
     }
