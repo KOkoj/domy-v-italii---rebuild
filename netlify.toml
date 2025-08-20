@@ -3,18 +3,19 @@
   command = "npm run build"
   publish = "dist"
 
-[build.environment]
-  VITE_API_URL = "https://domy-backend.vercel.app/api"
+# ❌ Do NOT set VITE_API_URL in production — client should use '/api' via api.ts
+# [build.environment]
+#   VITE_API_URL = "https://domy-backend.vercel.app/api"
 
-# API proxy redirects
+# API proxy to backend
 [[redirects]]
   from = "/api/*"
   to = "https://domy-backend.vercel.app/api/:splat"
   status = 200
   force = true
-  headers = {X-From = "Netlify"}
+  headers = { X-From = "Netlify" }
 
-# Handle client-side routing (SPA)
+# SPA routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
