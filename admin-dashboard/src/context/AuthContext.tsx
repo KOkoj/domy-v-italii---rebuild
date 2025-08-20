@@ -41,7 +41,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const authData = getAuthData()
 
       if (authData?.token) {
-        setToken(authData.token)
+        setToken(authData?.token ?? null)
         setRefreshToken(authData.refreshToken)
 
         try {
