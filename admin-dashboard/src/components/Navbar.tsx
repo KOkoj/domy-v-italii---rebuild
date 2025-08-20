@@ -3,7 +3,7 @@ import { Menu, User, LogOut, Settings, Building2, FileText } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { EnvWidget } from './EnvWidget'
 import { Button } from './ui/Button'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 interface NavbarProps {
   onMenuClick: () => void
@@ -13,6 +13,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const { user, logout } = useAuth()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
 
   const appName = import.meta.env.VITE_APP_NAME || 'Italian Real Estate Admin'
   const isDashboard = location.pathname === '/dashboard'
@@ -44,11 +45,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         {/* Dashboard Actions */}
         {isDashboard && (
           <div className="hidden lg:flex items-center space-x-2">
-            <button className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-blue-700 transition-colors flex items-center space-x-1.5">
+            <button
+              onClick={() => navigate('/properties/new')}
+              className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs font-medium hover:bg-blue-700 transition-colors flex items-center space-x-1.5"
+            >
               <Building2 className="w-3.5 h-3.5" />
               <span>Add Property</span>
             </button>
-            <button className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-xs font-medium hover:bg-gray-200 transition-colors flex items-center space-x-1.5">
+            <button
+              onClick={() => navigate('/blog/new')}
+              className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-xs font-medium hover:bg-gray-200 transition-colors flex items-center space-x-1.5"
+            >
               <FileText className="w-3.5 h-3.5" />
               <span>New Post</span>
             </button>
