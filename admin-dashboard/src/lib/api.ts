@@ -1,4 +1,6 @@
-import axios, { AxiosError, isAxiosError } from 'axios'
+// src/lib/api.ts
+import axios, { isAxiosError } from 'axios'
+import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios'
 
 /**
  * In dev: use VITE_API_URL or localhost.
@@ -42,21 +44,30 @@ const clearAuthData = () => {
   localStorage.removeItem(AUTH_KEY)
 }
 
-// Attach Bearer token
+// Request: attach Bearer token
 api.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     const auth = getAuthData()
     if (auth?.token) {
-      config.headers = { ...(config.headers ?? {}), Authorization: `Bearer ${auth.token}` }
+      // Axios v1: headers may be AxiosHeaders with .set()
+      if (typeof config.headers?.set === 'function') {
+        config.headers.set('Authorization', `Bearer ${auth.token}`)
+      } else {
+        // Fallback for plain object headers
+        config.headers = {
+          ...(config.headers ?? {}),
+          Authorization: `Bearer ${auth.token}`,
+        } as any
+      }
     }
     return config
   },
   (error) => Promise.reject(error)
 )
 
-// Refresh on 401 (one retry)
+// Response: refresh on 401 (one retry)
 api.interceptors.response.use(
-  (res) => res,
+  (response: AxiosResponse) => response,
   async (error: unknown) => {
     if (!isAxiosError(error)) return Promise.reject(error)
 
@@ -84,10 +95,16 @@ api.interceptors.response.use(
           }
           setAuthData(newAuth)
 
-          originalRequest.headers = {
-            ...(originalRequest.headers ?? {}),
-            Authorization: `Bearer ${newAuth.token}`,
+          // Re-attach token to the retried request
+          if (typeof originalRequest.headers?.set === 'function') {
+            originalRequest.headers.set('Authorization', `Bearer ${newAuth.token}`)
+          } else {
+            originalRequest.headers = {
+              ...(originalRequest.headers ?? {}),
+              Authorization: `Bearer ${newAuth.token}`,
+            }
           }
+
           return api(originalRequest)
         }
       } catch (e) {
