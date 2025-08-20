@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Building2, FileText, MessageSquare, TrendingUp, Calendar, Users, AlertCircle, RefreshCw } from 'lucide-react'
+import {
+  Building2,
+  FileText,
+  MessageSquare,
+  TrendingUp,
+  Calendar,
+  Users,
+  AlertCircle,
+  RefreshCw,
+} from 'lucide-react'
 import { api } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
@@ -66,7 +75,9 @@ const StatCard: React.FC<{
           <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">{title}</p>
           <p className="text-3xl font-bold text-gray-900 mt-1">{value.toLocaleString()}</p>
           {trend && (
-            <div className={`flex items-center mt-2 text-sm ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+            <div
+              className={`flex items-center mt-2 text-sm ${trend.isPositive ? 'text-green-600' : 'text-red-600'}`}
+            >
               <TrendingUp className={`w-4 h-4 mr-1 ${trend.isPositive ? '' : 'rotate-180'}`} />
               <span className="font-medium">{Math.abs(trend.value)}%</span>
               <span className="text-gray-500 ml-1">vs last month</span>
@@ -108,7 +119,10 @@ const ActivityCard: React.FC<{
       ) : (
         <div className="space-y-4">
           {items.slice(0, 5).map((item, index) => (
-            <div key={item.id || index} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+            <div
+              key={item.id || index}
+              className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+            >
               <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
@@ -125,9 +139,16 @@ const ActivityCard: React.FC<{
                 )}
                 {type === 'blog' && 'author' in item && 'status' in item && (
                   <div className="flex items-center space-x-2 mt-1">
-                    <span className="text-xs text-gray-500">By {item.author?.name || 'Unknown'}</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.status === 'PUBLISHED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
+                    <span className="text-xs text-gray-500">
+                      By {item.author?.name || 'Unknown'}
+                    </span>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        item.status === 'PUBLISHED'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}
+                    >
                       {item.status.toLowerCase()}
                     </span>
                   </div>
@@ -135,9 +156,15 @@ const ActivityCard: React.FC<{
                 {type === 'inquiries' && 'email' in item && 'status' in item && (
                   <div className="flex items-center space-x-2 mt-1">
                     <span className="text-xs text-gray-500">{item.email}</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${item.status === 'NEW' ? 'bg-blue-100 text-blue-800' :
-                      item.status === 'CONTACTED' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-                      }`}>
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        item.status === 'NEW'
+                          ? 'bg-blue-100 text-blue-800'
+                          : item.status === 'CONTACTED'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-green-100 text-green-800'
+                      }`}
+                    >
                       {item.status.toLowerCase()}
                     </span>
                   </div>
@@ -178,12 +205,15 @@ export const DashboardPage: React.FC = () => {
       // Get properties data
       const propertiesResponse = await api.get('/properties?limit=5')
       const properties = propertiesResponse.data.success ? propertiesResponse.data.data.items : []
-      
+
       // Try to get users count
       try {
         const usersResponse = await api.get('/users?limit=1')
         // Can be used for future dashboard stats if needed
-        console.log('Users available:', usersResponse.data.success ? usersResponse.data.data.meta?.total || 0 : 0)
+        console.log(
+          'Users available:',
+          usersResponse.data.success ? usersResponse.data.data.meta?.total || 0 : 0
+        )
       } catch (e) {
         console.log('Users endpoint not available')
       }
@@ -195,7 +225,7 @@ export const DashboardPage: React.FC = () => {
           activePropertiesCount: properties.filter((p: any) => p.status === 'ACTIVE').length,
           draftsCount: 0, // No blog data available
           inquiriesTodayCount: 0, // No inquiries data available
-          inquiriesWeekCount: 0
+          inquiriesWeekCount: 0,
         },
         activity: {
           properties: properties.slice(0, 5).map((p: any) => ({
@@ -203,11 +233,11 @@ export const DashboardPage: React.FC = () => {
             title: p.title,
             city: p.city || 'Unknown',
             type: p.type,
-            createdAt: p.createdAt
+            createdAt: p.createdAt,
           })),
           blog: [], // No blog data available
-          inquiries: [] // No inquiries data available
-        }
+          inquiries: [], // No inquiries data available
+        },
       }
 
       setDashboardData(fallbackData)
@@ -222,30 +252,39 @@ export const DashboardPage: React.FC = () => {
 
   // Fetch dashboard data (requires auth)
   const fetchDashboardData = useCallback(async () => {
+    if (!isAuthenticated) {
+      return
+    }
+
     setIsLoading(true)
     setError(null)
     setFallbackMode(false)
 
     try {
       const response = await api.get('/dashboard', {
-        timeout: 10000,
+        timeout: 15000,
       })
 
-      if (response.data.success) {
+      if (response.data && response.data.success) {
         setDashboardData(response.data.data)
         console.log('Dashboard data loaded successfully:', response.data.data)
       } else {
-        throw new Error(response.data.message || 'Failed to fetch dashboard data')
+        throw new Error(response.data?.message || 'Failed to fetch dashboard data')
       }
     } catch (error: any) {
       console.error('Dashboard endpoint failed:', error.message)
       console.log('Trying fallback mode...')
       // If dashboard endpoint is not available, try fallback
-      await fetchFallbackData()
+      try {
+        await fetchFallbackData()
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError)
+        setError('Unable to load dashboard data. Please try refreshing the page.')
+      }
     } finally {
       setIsLoading(false)
     }
-  }, [fetchFallbackData])
+  }, [fetchFallbackData, isAuthenticated])
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -261,7 +300,9 @@ export const DashboardPage: React.FC = () => {
             <Users className="w-10 h-10 text-gray-400" />
           </div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Authentication Required</h3>
-          <p className="text-gray-600 mb-6">Please log in to view your dashboard analytics and manage your properties.</p>
+          <p className="text-gray-600 mb-6">
+            Please log in to view your dashboard analytics and manage your properties.
+          </p>
           <button className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors">
             Go to Login
           </button>
@@ -276,7 +317,10 @@ export const DashboardPage: React.FC = () => {
         {/* Loading Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse">
+            <div
+              key={i}
+              className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 animate-pulse"
+            >
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-gray-200 rounded-lg" />
                 <div className="space-y-2">
@@ -291,7 +335,10 @@ export const DashboardPage: React.FC = () => {
         {/* Loading Activity Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div
+              key={i}
+              className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+            >
               <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse" />
@@ -328,10 +375,7 @@ export const DashboardPage: React.FC = () => {
           </div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Unable to Load Dashboard</h3>
           <p className="text-red-600 mb-6">{error}</p>
-          <Button
-            onClick={fetchDashboardData}
-            className="mr-3"
-          >
+          <Button onClick={fetchDashboardData} className="mr-3">
             <RefreshCw className="w-4 h-4 mr-2" />
             Try Again
           </Button>
@@ -348,8 +392,12 @@ export const DashboardPage: React.FC = () => {
           <div className="flex items-center space-x-2">
             <AlertCircle className="w-5 h-5 text-yellow-600" />
             <div>
-              <p className="text-sm font-medium text-yellow-800">Dashboard running in limited mode</p>
-              <p className="text-xs text-yellow-700">Some endpoints are still deploying. Showing available data.</p>
+              <p className="text-sm font-medium text-yellow-800">
+                Dashboard running in limited mode
+              </p>
+              <p className="text-xs text-yellow-700">
+                Some endpoints are still deploying. Showing available data.
+              </p>
             </div>
           </div>
         </div>
