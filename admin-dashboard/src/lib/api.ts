@@ -1,106 +1,99 @@
-import axios, { AxiosError, AxiosResponse } from 'axios'
+import axios, { AxiosError, isAxiosError } from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+/**
+ * In dev: use VITE_API_URL or localhost.
+ * In prod: ALWAYS use relative '/api' so Netlify proxy handles it.
+ */
+const isDev = import.meta.env.DEV
+const baseURL = isDev
+  ? (import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api')
+  : '/api'
 
-// Debug logging for production
-console.log('API Configuration:', {
-  VITE_API_URL: import.meta.env.VITE_API_URL,
-  API_URL,
-  mode: import.meta.env.MODE,
-  env: import.meta.env
-})
-
-export interface ApiResponse<T = any> {
-  success: boolean
-  data?: T
-  message?: string
-  error?: any
-}
-
-export interface ApiError {
-  success: false
-  message: string
-  error?: any
-}
-
-// Create axios instance
 export const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: false, // set true only if you actually use cookies
 })
 
-// Helper to get auth data from localStorage
-const getAuthData = () => {
+// Minimal debug (safe for prod)
+if (typeof window !== 'undefined') {
+  // eslint-disable-next-line no-console
+  console.log('API baseURL:', api.defaults.baseURL)
+}
+
+// --- Auth helpers ---
+type AuthData = { token?: string; refreshToken?: string } & Record<string, any>
+const AUTH_KEY = 'ire_admin_auth'
+
+const getAuthData = (): AuthData | null => {
   try {
-    const authData = localStorage.getItem('ire_admin_auth')
-    return authData ? JSON.parse(authData) : null
+    const s = localStorage.getItem(AUTH_KEY)
+    return s ? JSON.parse(s) : null
   } catch {
     return null
   }
 }
 
-// Helper to set auth data in localStorage
-const setAuthData = (data: any) => {
-  localStorage.setItem('ire_admin_auth', JSON.stringify(data))
+const setAuthData = (data: AuthData) => {
+  localStorage.setItem(AUTH_KEY, JSON.stringify(data))
 }
 
-// Helper to clear auth data
 const clearAuthData = () => {
-  localStorage.removeItem('ire_admin_auth')
+  localStorage.removeItem(AUTH_KEY)
 }
 
-// Request interceptor to attach Authorization header
+// Attach Bearer token
 api.interceptors.request.use(
   (config) => {
-    const authData = getAuthData()
-    if (authData?.token) {
-      config.headers.Authorization = `Bearer ${authData.token}`
+    const auth = getAuthData()
+    if (auth?.token) {
+      config.headers = { ...(config.headers ?? {}), Authorization: `Bearer ${auth.token}` }
     }
     return config
   },
   (error) => Promise.reject(error)
 )
 
-// Response interceptor to handle token refresh
+// Refresh on 401 (one retry)
 api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as any
+  (res) => res,
+  async (error: unknown) => {
+    if (!isAxiosError(error)) return Promise.reject(error)
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const { response, config } = error
+    const originalRequest: any = config
+
+    if (response?.status === 401 && !originalRequest?._retry) {
       originalRequest._retry = true
 
-      const authData = getAuthData()
-      if (authData?.refreshToken) {
-        try {
-          const response = await axios.post(`${API_URL}/auth/refresh`, {
-            refreshToken: authData.refreshToken,
-          })
-
-          if (response.data.success) {
-            const newAuthData = {
-              ...authData,
-              token: response.data.data.token,
-              refreshToken: response.data.data.refreshToken,
-            }
-            setAuthData(newAuthData)
-
-            // Retry the original request with new token
-            originalRequest.headers.Authorization = `Bearer ${response.data.data.token}`
-            return api(originalRequest)
-          }
-        } catch (refreshError) {
-          // Refresh failed, clear auth and redirect to login
-          clearAuthData()
-          window.location.href = '/login'
-          return Promise.reject(refreshError)
-        }
-      } else {
-        // No refresh token, clear auth and redirect to login
+      const auth = getAuthData()
+      if (!auth?.refreshToken) {
         clearAuthData()
         window.location.href = '/login'
+        return Promise.reject(error)
+      }
+
+      try {
+        // Use the same baseURL (goes through proxy in prod)
+        const rr = await api.post('/auth/refresh', { refreshToken: auth.refreshToken })
+        if (rr.data?.success) {
+          const newAuth: AuthData = {
+            ...auth,
+            token: rr.data.data.token,
+            refreshToken: rr.data.data.refreshToken,
+          }
+          setAuthData(newAuth)
+
+          originalRequest.headers = {
+            ...(originalRequest.headers ?? {}),
+            Authorization: `Bearer ${newAuth.token}`,
+          }
+          return api(originalRequest)
+        }
+      } catch (e) {
+        clearAuthData()
+        window.location.href = '/login'
+        return Promise.reject(e)
       }
     }
 
@@ -108,28 +101,25 @@ api.interceptors.response.use(
   }
 )
 
-// Helper function to normalize API errors
-export const normalizeError = (error: any): ApiError => {
-  if (error.response?.data) {
-    return {
-      success: false,
-      message: error.response.data.message || 'An error occurred',
-      error: error.response.data.error,
-    }
+// Normalized error for UI
+export const normalizeError = (
+  error: unknown
+): { success: false; message: string; status?: number } => {
+  if (isAxiosError(error)) {
+    const status = error.response?.status
+    const message =
+      (error.response?.data as any)?.message ??
+      error.message ??
+      (status ? `Request failed with status ${status}` : 'Network error')
+    return { success: false, message, status }
   }
-
-  if (error.message) {
-    return {
-      success: false,
-      message: error.message,
-    }
-  }
-
-  return {
-    success: false,
-    message: 'An unexpected error occurred',
+  if (error instanceof Error) return { success: false, message: error.message }
+  if (typeof error === 'string') return { success: false, message: error }
+  try {
+    return { success: false, message: JSON.stringify(error) }
+  } catch {
+    return { success: false, message: 'Unknown error' }
   }
 }
 
-// Export auth helpers
 export { getAuthData, setAuthData, clearAuthData }
