@@ -1,134 +1,90 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { api, getAuthData, setAuthData, clearAuthData, normalizeError } from '@/lib/api'
-import toast from 'react-hot-toast'
+// src/context/AuthContext.tsx
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  ReactNode,
+} from "react";
+import { api, normalizeError, getAuthData, setAuthData, clearAuthData } from "@/lib/api";
+import toast from "react-hot-toast";
 
-export interface User {
-  id: string
-  email: string
-  name: string
-  role: 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
-  isActive: boolean
-  avatar?: string
-  createdAt: string
-  updatedAt: string
-}
+type AuthData = {
+  token: string | null;
+  refreshToken: string | null;
+};
 
-interface AuthContextType {
-  user: User | null
-  token: string | null
-  refreshToken: string | null
-  isLoading: boolean
-  login: (email: string, password: string) => Promise<void>
-  logout: () => void
-  isAuthenticated: boolean
-}
+type AuthContextValue = {
+  token: string | null;
+  refreshToken: string | null;
+  setToken: React.Dispatch<React.SetStateAction<string | null>>;
+  setRefreshToken: React.Dispatch<React.SetStateAction<string | null>>;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+};
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-interface AuthProviderProps {
-  children: ReactNode
-}
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  // ✅ Initialize with null-safe values
+  const [token, setToken] = useState<string | null>(() => getAuthData()?.token ?? null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(
+    () => getAuthData()?.refreshToken ?? null
+  );
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(null)
-  const [refreshToken, setRefreshToken] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  // Initialize auth state from localStorage
+  // Keep state in sync if something else updates localStorage (rare but safe)
   useEffect(() => {
-    const initAuth = async () => {
-      const authData = getAuthData()
-
-      if (authData?.token) {
-        setToken(authData?.token ?? null)
-        setRefreshToken(authData.refreshToken)
-
-        try {
-          // Verify token by calling /auth/me
-          const response = await api.get('/auth/me')
-
-          if (response.data.success) {
-            setUser(response.data.data.user || response.data.data)
-          } else {
-            // Invalid token, clear auth
-            clearAuthData()
-          }
-        } catch (error) {
-          // Token invalid or expired, clear auth
-          clearAuthData()
-          setToken(null)
-          setRefreshToken(null)
-        }
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "ire_admin_auth") {
+        const data = getAuthData();
+        setToken(data?.token ?? null);
+        setRefreshToken(data?.refreshToken ?? null);
       }
-
-      setIsLoading(false)
-    }
-
-    initAuth()
-  }, [])
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const login = async (email: string, password: string) => {
     try {
-      setIsLoading(true)
-      const response = await api.post('/auth/login', { email, password })
-
-      if (response.data.success) {
-        const {
-          token: newToken,
-          refreshToken: newRefreshToken,
-          user: userData,
-        } = response.data.data
-
-        const authData = {
-          token: newToken,
-          refreshToken: newRefreshToken,
-          user: userData,
-        }
-
-        setAuthData(authData)
-        setToken(newToken)
-        setRefreshToken(newRefreshToken)
-        setUser(userData)
-
-        toast.success('Login successful!')
-      } else {
-        throw new Error(response.data.message || 'Login failed')
+      const res = await api.post("/auth/login", { email, password });
+      if (!res.data?.success) {
+        throw new Error(res.data?.message || "Login failed");
       }
-    } catch (error) {
-      const normalizedError = normalizeError(error)
-      toast.error(normalizedError.message)
-      throw error
-    } finally {
-      setIsLoading(false)
+      const t = res.data.data?.token ?? null;          // ✅ null, not undefined
+      const rt = res.data.data?.refreshToken ?? null;  // ✅ null, not undefined
+
+      setToken(t);
+      setRefreshToken(rt);
+      setAuthData({ ...(getAuthData() || {}), token: t, refreshToken: rt });
+      toast.success("Logged in");
+    } catch (error: unknown) {
+      const { message } = normalizeError(error);
+      toast.error(message);
+      throw error;
     }
-  }
+  };
 
   const logout = () => {
-    clearAuthData()
-    setUser(null)
-    setToken(null)
-    setRefreshToken(null)
-    toast.success('Logged out successfully')
-  }
+    clearAuthData();
+    setToken(null);
+    setRefreshToken(null);
+    toast.success("Logged out");
+  };
 
-  const value: AuthContextType = {
-    user,
-    token,
-    refreshToken,
-    isLoading,
-    login,
-    logout,
-    isAuthenticated: !!user && !!token,
-  }
+  const value = useMemo<AuthContextValue>(
+    () => ({ token, refreshToken, setToken, setRefreshToken, login, logout }),
+    [token, refreshToken]
+  );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
 
-export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+export const useAuth = (): AuthContextValue => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context
-}
+  return ctx;
+};
