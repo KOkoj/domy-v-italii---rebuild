@@ -10,16 +10,25 @@ import React, {
 import { api, normalizeError, getAuthData, setAuthData, clearAuthData } from "@/lib/api";
 import toast from "react-hot-toast";
 
-type AuthData = {
-  token: string | null;
-  refreshToken: string | null;
-};
+type User = {
+  id?: string;
+  email?: string;
+  name?: string;
+  role?: string;
+} | null;
 
 type AuthContextValue = {
+  // state
   token: string | null;
   refreshToken: string | null;
+  user: User;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  // setters
   setToken: React.Dispatch<React.SetStateAction<string | null>>;
   setRefreshToken: React.Dispatch<React.SetStateAction<string | null>>;
+  setUser: React.Dispatch<React.SetStateAction<User>>;
+  // actions
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 };
@@ -27,37 +36,39 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  // ✅ Initialize with null-safe values
-  const [token, setToken] = useState<string | null>(() => getAuthData()?.token ?? null);
-  const [refreshToken, setRefreshToken] = useState<string | null>(
-    () => getAuthData()?.refreshToken ?? null
-  );
+  // hydrate from localStorage (safe-null)
+  const initial = getAuthData();
+  const [token, setToken] = useState<string | null>(initial?.token ?? null);
+  const [refreshToken, setRefreshToken] = useState<string | null>(initial?.refreshToken ?? null);
+  const [user, setUser] = useState<User>(initial?.user ?? null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Keep state in sync if something else updates localStorage (rare but safe)
+  // one-time hydration (covers SSR/first paint)
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "ire_admin_auth") {
-        const data = getAuthData();
-        setToken(data?.token ?? null);
-        setRefreshToken(data?.refreshToken ?? null);
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    const data = getAuthData();
+    setToken(data?.token ?? null);
+    setRefreshToken(data?.refreshToken ?? null);
+    setUser(data?.user ?? null);
+    setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
       const res = await api.post("/auth/login", { email, password });
-      if (!res.data?.success) {
-        throw new Error(res.data?.message || "Login failed");
-      }
-      const t = res.data.data?.token ?? null;          // ✅ null, not undefined
-      const rt = res.data.data?.refreshToken ?? null;  // ✅ null, not undefined
+      if (!res.data?.success) throw new Error(res.data?.message || "Login failed");
+
+      const t = res.data?.data?.token ?? null;
+      const rt = res.data?.data?.refreshToken ?? null;
+      const u: User = res.data?.data?.user ?? null;
 
       setToken(t);
       setRefreshToken(rt);
-      setAuthData({ ...(getAuthData() || {}), token: t, refreshToken: rt });
+      setUser(u);
+
+      // persist all pieces so Provider rehydrates consistently
+      const prev = getAuthData() || {};
+      setAuthData({ ...prev, token: t, refreshToken: rt, user: u });
+
       toast.success("Logged in");
     } catch (error: unknown) {
       const { message } = normalizeError(error);
@@ -70,12 +81,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     clearAuthData();
     setToken(null);
     setRefreshToken(null);
+    setUser(null);
     toast.success("Logged out");
   };
 
   const value = useMemo<AuthContextValue>(
-    () => ({ token, refreshToken, setToken, setRefreshToken, login, logout }),
-    [token, refreshToken]
+    () => ({
+      token,
+      refreshToken,
+      user,
+      isAuthenticated: !!token,
+      isLoading,
+      setToken,
+      setRefreshToken,
+      setUser,
+      login,
+      logout,
+    }),
+    [token, refreshToken, user, isLoading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -83,8 +106,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAuth = (): AuthContextValue => {
   const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
+  if (!ctx) throw new Error("useAuth must be used within an AuthProvider");
   return ctx;
 };
