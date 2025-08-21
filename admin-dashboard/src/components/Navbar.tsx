@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Menu, User, LogOut, Settings, Building2, FileText } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Menu, LogOut, Settings, Building2, FileText } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { EnvWidget } from './EnvWidget'
 import { Button } from './ui/Button'
@@ -11,14 +11,23 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const { user, logout } = useAuth()
-  const displayName = user?.name || user?.email || 'User';
-  const initials = displayName
-  .trim()
-  .split(/\s+/)
-  .map(p => p[0]?.toUpperCase())
-  .slice(0, 2)
-  .join('') || 'U';
-  const avatarUrl = user?.avatar || '';
+
+  // Safe display name + initials + avatar url
+  const displayName = user?.name || user?.email || 'User'
+  const initials =
+    displayName
+      .trim()
+      .split(/\s+/)
+      .map((p) => p[0]?.toUpperCase())
+      .slice(0, 2)
+      .join('') || 'U'
+  const avatarUrl = user?.avatar || null
+
+  // If avatar fails to load, fall back to initials
+  const [imgError, setImgError] = useState(false)
+  useEffect(() => {
+    setImgError(false) // reset on avatar change
+  }, [avatarUrl])
 
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const location = useLocation()
@@ -84,14 +93,21 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
             onClick={() => setUserMenuOpen(!userMenuOpen)}
             className="flex items-center space-x-2"
           >
-            {user?.avatar ? (
-              <img src={user.avatar} alt={user.name} className="w-7 h-7 rounded-full" />
-            ) : (
-              <div className="w-7 h-7 bg-gray-300 rounded-full flex items-center justify-center">
-                <User className="w-3.5 h-3.5 text-gray-600" />
-              </div>
-            )}
-            <span className="hidden md:block text-sm font-medium text-gray-700">{user?.name}</span>
+            <div className="h-7 w-7 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+              {avatarUrl && !imgError ? (
+                <img
+                  src={avatarUrl}
+                  alt={displayName}
+                  className="h-7 w-7 object-cover"
+                  onError={() => setImgError(true)}
+                />
+              ) : (
+                <span className="text-xs font-bold text-gray-600">{initials}</span>
+              )}
+            </div>
+            <span className="hidden md:block text-sm font-medium text-gray-700">
+              {displayName}
+            </span>
           </Button>
 
           {/* Dropdown Menu */}
@@ -101,7 +117,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-20">
                 <div className="py-1">
                   <div className="px-4 py-2 border-b border-gray-200">
-                    <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                    <p className="text-sm font-medium text-gray-900">{user?.name || displayName}</p>
                     <p className="text-sm text-gray-500">{user?.email}</p>
                     <p className="text-xs text-gray-400 capitalize">
                       {user?.role ? user.role.toLowerCase() : 'user'}
