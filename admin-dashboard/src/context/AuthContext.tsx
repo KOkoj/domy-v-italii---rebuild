@@ -15,6 +15,7 @@ type User = {
   email?: string;
   name?: string;
   role?: string;
+  avatar?: string | null; // ✅ added
 } | null;
 
 type AuthContextValue = {
