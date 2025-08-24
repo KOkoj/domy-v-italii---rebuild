@@ -11,7 +11,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const { user, logout } = useAuth()
-  const displayName = user?.name || user?.email || 'User';
+  // const displayName = user?.name || user?.email || 'User';
   // const initials = displayName
   //   .trim()
   //   .split(/\s+/)
