@@ -66,15 +66,8 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
 
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-  console.log(`[DEBUG] ${req.method} ${req.url}`);
-  next();
-});
-
 // Temporary blog POST endpoint for testing
 app.post('/api/blog', (req, res) => {
-  console.log('[DEBUG] POST /api/blog endpoint hit!');
   // Check for authorization header
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
