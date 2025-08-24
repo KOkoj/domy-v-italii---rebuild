@@ -111,7 +111,7 @@ app.use((_req, res) => {
 });
 
 // Error handler
-app.use((err: any, _req: any, res: any, _next: any) => {
+app.use((err, _req, res, _next) => {
   console.error('Error:', err);
   res.status(500).json({
     success: false,
