@@ -12,5 +12,5 @@
       "dest": "/backend/api/index.cjs"
     }
   ],
-  "installCommand": "cd backend && npm install"
+  "buildCommand": "cd backend && npm install && npx prisma generate"
 }
