@@ -1,7 +1,15 @@
 import serverless from 'serverless-http';
-import { app } from '../src/app.js';
 
-// Create the serverless handler
-const handler = serverless(app);
-
-export default handler;
+export default async function handler(req: any, res: any) {
+  try {
+    const { app } = await import('../dist/app.js');
+    const serverlessHandler = serverless(app);
+    return serverlessHandler(req, res);
+  } catch (error: any) {
+    console.error('Serverless handler error:', error);
+    return res.status(500).json({ 
+      error: 'Handler failed', 
+      message: error.message 
+    });
+  }
+}
