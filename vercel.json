@@ -1,4 +1,15 @@
 {
-  "buildCommand": "cd backend && npm install && npx prisma generate",
-  "installCommand": "npm install"
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend/api/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/backend/api/index.ts"
+    }
+  ]
 }
