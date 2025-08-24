@@ -12,13 +12,13 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const { user, logout } = useAuth()
   const displayName = user?.name || user?.email || 'User';
-  const initials = displayName
-  .trim()
-  .split(/\s+/)
-  .map(p => p[0]?.toUpperCase())
-  .slice(0, 2)
-  .join('') || 'U';
-  const avatarUrl = user?.avatar || '';
+  // const initials = displayName
+  //   .trim()
+  //   .split(/\s+/)
+  //   .map(p => p[0]?.toUpperCase())
+  //   .slice(0, 2)
+  //   .join('') || 'U';
+  // const avatarUrl = user?.avatar || '';
 
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const location = useLocation()
