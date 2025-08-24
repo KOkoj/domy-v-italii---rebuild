@@ -3,14 +3,7 @@
   "builds": [
     {
       "src": "backend/api/index.ts",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "backend/dist/**",
-          "backend/node_modules/**",
-          "node_modules/**"
-        ]
-      }
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -19,5 +12,5 @@
       "dest": "/backend/api/index.ts"
     }
   ],
-  "buildCommand": "cd backend && npm install && npm run local-build"
+  "installCommand": "cd backend && npm install"
 }
